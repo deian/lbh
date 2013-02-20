@@ -1,0 +1,23 @@
+@import url(https://fonts.googleapis.com/css?family=Ubuntu:400,700,400italic,700italic|Inika:400,700);
+
+body {
+  padding-top: 60px;
+  font-family: "Ubuntu", sans-serif;
+}
+
+h1, h2, h3, h4 {
+  font-family: "Inika", serif;
+}
+
+p {
+  font-size: 110%;
+}
+
+.nav-pills > li a {
+  border: 1px solid #ccc;
+  border-right: 1px solid #ccc;
+}
+
+.nav-pills > .active a {
+  border: 0px;
+}
