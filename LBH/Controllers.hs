@@ -25,6 +25,9 @@ import qualified Hails.Web.Frank as Frank
 import           LBH.MP
 import           LBH.Views
 
+import           LBH.ActiveHaskell
+import           Data.Aeson (decode, encode)
+
 import Debug.Trace
 
 server :: Application
@@ -32,7 +35,12 @@ server = mkRouter $ do
   routeTop $ redirectTo "/posts/"
   routeName "posts" postsController
   routeName "users" usersController
+  Frank.post "/exec" execController
   Frank.get "/login" $ withAuthUser $ \_ -> redirectBack
+
+--
+-- Posts
+--
 
 postsController :: RESTController
 postsController = do
@@ -44,7 +52,7 @@ postsController = do
       return (fromMaybe (User { userId = postOwner p
                               , userFullName = T.empty
                               , userEmail = T.empty }) u, p)
-    return $ respondHtml mu $ indexPosts mu ups :: Controller Response
+    return $ respondHtml mu $ indexPosts mu ups
   REST.new $ withAuthUser $ \u ->
     return $ respondHtml (Just u) (newPost u)
   REST.create $ withAuthUser $ const $ do
@@ -75,12 +83,16 @@ postsController = do
                        post <- unlabel lpost
                        return $ redirectTo $ "/posts/" ++ show (getPostId post)
 
+--
+-- Users
+--
+
 usersController :: RESTController
 usersController = do
   REST.index $ do
     mu <- currentUser
     ps <- liftLIO . withLBHPolicy $ findAll $ select [] "users"
-    return $ respondHtml mu $ indexUsers mu ps :: Controller Response
+    return $ respondHtml mu $ indexUsers mu ps
   REST.new $ withAuthUser $ \u ->
     return $ redirectTo $ "/users/" ++ T.unpack (userId u) ++ "/edit"
   REST.show $ do
@@ -106,3 +118,19 @@ usersController = do
       void $ saveLabeledRecord luser
       user <- unlabel luser
       return $ redirectTo $ "/users/" ++ T.unpack (userId user)
+
+--
+-- Code execution
+--
+
+execController :: Controller Response
+execController = do
+  ct <- requestHeader "content-type"
+  if ct /= Just "text/json"
+    then return badRequest
+    else do obj <- decode `liftM` body
+            case obj of
+              Nothing -> return badRequest
+              Just c -> do
+                r <- liftLIO $ execCode c
+                return $ ok "text/json" (encode r)

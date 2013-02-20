@@ -19,5 +19,9 @@ ul#index-posts li:hover {
 }
 
 .raw-active-haskell {
-		display: none;
+	display: none;
+}
+
+.result-sucess {
+  color: green;
 }
