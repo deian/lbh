@@ -12,7 +12,12 @@ ul#index-posts li:hover {
 }
 
 #post-preview-body {
-  height:250px;
+  min-height:250px;
   width:100%;
 	overflow:auto;
+	border:0px;
+}
+
+.raw-active-haskell {
+		display: none;
 }

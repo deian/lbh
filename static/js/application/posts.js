@@ -3,12 +3,21 @@ $(document).ready(function() {
 	var do_preview=false;
 
   var refresh_preview = function() {
-    $("#post-preview-body").empty();
-    var url = $("#post-preview-body").data("src");
-    $.get(url, function () {}).done(function(doc) {
-      $(doc).find("#post-body").appendTo("#post-preview-body")
-    });
+    $("#post-preview-body").attr("src", $("#post-preview-body").attr("src"));
   }
+
+  $("#post-preview-body").load( function() {
+	  // TODO: this is pretty hacky, make it less so
+	  // 1) hide navigation bar:
+		var doc = $("#post-preview-body").contents();
+    doc.find("#page-nav").hide();
+	  doc.find('head').append("<style> body { padding-top: 0px; } </style>");
+	  // 2) remove header:
+    doc.find("#post-header").hide();
+	  // 3) adjust height of
+    $("#post-preview-body").height(doc.height());
+
+  });
 
   $("#post-preview-btn").click( function () {
 		if(!preview_init) {
@@ -49,6 +58,20 @@ $(document).ready(function() {
 						    if(do_preview) { refresh_preview(); }
 								$("#post-make-public-btn").hide();
 						});
+	});
+
+	$.map($(".active-haskell"), function(c_blk) {
+			var mkController = function(id) {
+				return $("<a>", { href : "#"
+							      	  , click : function() {
+							       			  console.log($("#raw-"+id).text());
+													  return false;
+							       		  }
+				                , html : "<i class=\"icon-cog\"></i>Execute"
+							       	  }).attr("class","pull-right");
+			};
+			var ctrl = mkController(c_blk.id);
+			ctrl.appendTo(c_blk);
 	});
 
 });

@@ -3,6 +3,7 @@ module LBH.Views where
 
 import           Prelude hiding (div, span, head, id)
 import           LBH.MP
+import           LBH.Utils
 
 import           Control.Monad
 import           Data.Maybe
@@ -24,6 +25,7 @@ import qualified Text.Pandoc.Writers.HTML as P
 import qualified Text.Pandoc.Options as P
 import qualified Text.Pandoc.Highlighting as P
 
+
 import Debug.Trace
 
 respondHtml :: Maybe User -> Html -> Response
@@ -35,7 +37,8 @@ respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
     script ! src "/static/js/jquery.min.js" $ ""
     script ! src "/static/js/bootstrap.min.js" $ ""
   body $ do
-     div ! class_ "navbar navbar-fixed-top navbar-inverse" $ do
+     div ! class_ "navbar navbar-fixed-top navbar-inverse"
+         ! id "page-nav" $ do
        div ! class_ "navbar-inner" $ do
          div ! class_ "container" $ do
            a ! href "/" ! class_ "brand" $ "Learn By Hacking" 
@@ -131,15 +134,17 @@ editPost post = do
          a ! href "#"
            ! id "refresh-post-preview-btn"
            ! A.title "Refresh" $ i ! class_ "icon-refresh" $ ""
-    div ! id "post-preview-body"
-        ! dataAttribute "src" (toValue $ "/posts/" ++ (show $ getPostId post))
-        $ ""
+    iframe ! id "post-preview-body"
+           ! src (toValue $ "/posts/" ++ (show $ getPostId post))
+           $ ""
 
 showPost :: Maybe User -> Post -> Html
 showPost muser post = do
-  h1 $ toHtml $ postTitle post
+  stylesheet "/static/css/application/posts.css"
+  script ! src "/static/js/application/posts.js" $ ""
   -- Include post header
   div ! id "post-header" $ do
+    h1 $ toHtml $ postTitle post
     ul ! class_ "inline" $ do
       li $ do
         i ! class_ "icon-time" $ ""
@@ -155,14 +160,15 @@ showPost muser post = do
                               ++ "/edit") $ do
           i ! class_ "icon-edit" $ ""
           " edit"
-  hr
+    hr
   div ! id "post-body" $ do
     -- Include kate syntax highlighting css
     style $ toHtml $ P.styleToCss P.kate
     -- Include post body
     div $ do
       P.writeHtml wopts $
-       P.readMarkdown ropts (T.unpack . crlf2lf $ postBody post)
+       let md = P.readMarkdown ropts (T.unpack . crlf2lf $ postBody post)
+       in extractHaskellCodeBlocks md
      where ropts = P.def { P.readerExtensions     = P.githubMarkdownExtensions }
            wopts = P.def { P.writerHighlight      = True
                          , P.writerHighlightStyle = P.kate
