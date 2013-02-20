@@ -5,6 +5,8 @@
 module LBH.Controllers where
 
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.Text as T
+import           Data.Maybe
 
 import           Control.Monad
 
@@ -12,7 +14,7 @@ import           LIO
 import           LIO.DCLabel
 
 import           Hails.Data.Hson (ObjectId, labeledRequestToHson)
-import           Hails.Database (select)
+import           Hails.Database
 import           Hails.Database.Structured
 import           Hails.HttpServer.Types
 import           Hails.Web
@@ -29,37 +31,42 @@ server :: Application
 server = mkRouter $ do
   routeTop $ redirectTo "/posts/"
   routeName "posts" postsController
-  Frank.get "/login" $ withUserOrDoAuth $ \_ -> redirectBack
+  routeName "users" usersController
+  Frank.get "/login" $ withAuthUser $ \_ -> redirectBack
 
 postsController :: RESTController
 postsController = do
   REST.index $ do
-    mu <- getHailsUser
+    mu <- currentUser
     ps <- liftLIO . withLBHPolicy $ findAll $ select [] "posts"
-    return $ respondHtml mu $ indexPosts mu ps :: Controller Response
-  REST.new $ withUserOrDoAuth $ \u ->
+    ups <- liftLIO $ forM ps $ \p-> do
+      u <- withLBHPolicy $ findBy  "users" "_id" (postOwner p)
+      return (fromMaybe (User { userId = postOwner p
+                              , userFullName = T.empty
+                              , userEmail = T.empty }) u, p)
+    return $ respondHtml mu $ indexPosts mu ups :: Controller Response
+  REST.new $ withAuthUser $ \u ->
     return $ respondHtml (Just u) (newPost u)
-  REST.create $ withUserOrDoAuth $ const $ do
+  REST.create $ withAuthUser $ const $ do
     lreq <- request 
     liftLIO . withLBHPolicy $ do
       lpost <- liftLIO $ labeledRequestToPost lreq
       void $ insertLabeledRecord lpost
       return $ redirectTo $ "/posts/"
   REST.show $ do
-    mu <- getHailsUser
+    mu <- currentUser
     (Just pid) <- queryParam "id"
     mpost <- liftLIO . withLBHPolicy $ do
       let _id = read . S8.unpack $ pid :: ObjectId
       findBy "posts" "_id" _id
     return $ maybe notFound (respondHtml mu . showPost mu) mpost
-  REST.edit $ withUserOrDoAuth $ \usr -> do
+  REST.edit $ withAuthUser $ \usr -> do
     (Just pid) <- queryParam "id"
     mpost <- liftLIO . withLBHPolicy $ do
       let _id = read . S8.unpack $ pid :: ObjectId
       findBy "posts" "_id" _id
-    return $ maybe notFound (respondHtml (Just usr) . editPost usr) mpost
-  REST.update $ withUserOrDoAuth $ \usr -> do
-    trace (show "UPDATE") $ return ()
+    return $ maybe notFound (respondHtml (Just usr) . editPost) mpost
+  REST.update $ withAuthUser $ \usr -> do
     ldoc <- request >>= labeledRequestToHson
     mlpost <- liftLIO $ partiallyFillPost ldoc
     case mlpost of
@@ -67,3 +74,35 @@ postsController = do
       Just lpost -> do liftLIO $ savePost lpost
                        post <- unlabel lpost
                        return $ redirectTo $ "/posts/" ++ show (getPostId post)
+
+usersController :: RESTController
+usersController = do
+  REST.index $ do
+    mu <- currentUser
+    ps <- liftLIO . withLBHPolicy $ findAll $ select [] "users"
+    return $ respondHtml mu $ indexUsers mu ps :: Controller Response
+  REST.new $ withAuthUser $ \u ->
+    return $ redirectTo $ "/users/" ++ T.unpack (userId u) ++ "/edit"
+  REST.show $ do
+    mu <- currentUser
+    (Just uid) <- queryParam "id"
+    (muser, ps) <- liftLIO . withLBHPolicy $ do
+      muser <- findBy "users" "_id" uid
+      ps <- maybe (return [])
+                  (\o -> findAll $ select ["owner" -: userId o] "posts") muser
+      return (muser, ps)
+    return $ maybe notFound
+                   (respondHtml mu . (\u -> showUser u ps (mu==muser))) muser
+  REST.edit $ withAuthUser $ \usr -> do
+    (Just uid) <- queryParam "id"
+    if (T.unpack (userId usr) /= S8.unpack uid)
+      then return forbidden
+      else do muser <- liftLIO . withLBHPolicy $ findBy "users" "_id" uid
+              return $ maybe notFound (respondHtml (Just usr) . editUser) muser
+  REST.update $ withAuthUser $ \usr -> do
+    ldoc <- request >>= labeledRequestToHson
+    liftLIO . withLBHPolicy $ do
+      luser <- fromLabeledDocument ldoc
+      void $ saveLabeledRecord luser
+      user <- unlabel luser
+      return $ redirectTo $ "/users/" ++ T.unpack (userId user)

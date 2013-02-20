@@ -3,11 +3,15 @@
            , DeriveDataTypeable
            , MultiParamTypeClasses #-}
 -- | Defines the data model and security policy of posts.
-module LBH.MP ( PostId
-                , getPostId
-                , Post(..), labeledRequestToPost, partiallyFillPost 
-                , savePost
-                , withLBHPolicy ) where
+module LBH.MP ( withLBHPolicy
+                -- * Posts
+              , PostId
+              , getPostId
+              , Post(..), labeledRequestToPost, partiallyFillPost 
+              , savePost
+                -- * Users
+              , User(..), currentUser, withAuthUser
+              ) where
 
 import           Prelude hiding (lookup)
 
@@ -32,26 +36,8 @@ import           LIO
 import           LIO.DCLabel
 
 --
--- Posts
+-- Policy
 --
-
-
--- | Post identifiers (@Nothing@ if post is newly create).
-type PostId  = Maybe ObjectId
-
--- | Unsafe post id extrat
-getPostId :: Post -> ObjectId
-getPostId = fromJust . postId
-
--- | Data type encoding posts.
-data Post = Post { postId          :: PostId
-                 , postTitle       :: Text
-                 , postOwner       :: UserName
-                 , postDescription :: Text
-                 , postBody        :: Text
-                 , postIsPublic    :: Bool
-                 , postDate        :: UTCTime
-                 } deriving (Show, Eq)
 
 -- | The type constructor should not be exported to avoid leaking
 -- the privilege.
@@ -67,6 +53,7 @@ instance PolicyModule LBHPolicy where
          readers ==> anybody
          writers ==> anybody
          admins  ==> this
+       -- = Posts ===================================================
        collection "posts" $ do
        -- Anybody can write a new post
        -- Only owner of the post can modify it
@@ -84,14 +71,49 @@ instance PolicyModule LBHPolicy where
                          then anybody
                          else this \/ owner
            writers ==> this \/ owner
-      --
+         field "owner" $ searchable
+       -- = Users ===================================================
+       collection "users" $ do
+         access $ do
+           readers ==> anybody
+           writers ==> anybody
+         clearance $ do
+           secrecy   ==> this
+           integrity ==> anybody
+         document $ \doc -> do
+           let (Just u) = fromDocument doc
+               user = userToPrincipal . userId $ u
+           readers ==> anybody
+           writers ==> this \/ user
+         field "fullName" $ searchable
+       --
      return $ LBHPolicyTCB priv
        where this = privDesc priv
              userToPrincipal = principal . S8.pack . T.unpack
 
 
-instance DCLabeledRecord LBHPolicy Post where
-  endorseInstance _ = LBHPolicyTCB noPriv
+
+--
+-- Posts
+--
+
+--- | Post identifiers (@Nothing@ if post is newly create).
+type PostId  = Maybe ObjectId
+
+-- | Unsafe post id extrat
+getPostId :: Post -> ObjectId
+getPostId = fromJust . postId
+
+-- | Data type encoding posts.
+data Post = Post { postId          :: PostId
+                 , postTitle       :: Text
+                 , postOwner       :: UserName
+                 , postDescription :: Text
+                 , postBody        :: Text
+                 , postIsPublic    :: Bool
+                 , postDate        :: UTCTime
+                 } deriving (Show, Eq)
+
 
 instance DCRecord Post where
   fromDocument doc = do
@@ -123,6 +145,10 @@ instance DCRecord Post where
               , "isPublic"    -: postIsPublic p ]
 
   recordCollection _ = "posts"
+
+instance DCLabeledRecord LBHPolicy Post where
+  endorseInstance _ = LBHPolicyTCB noPriv
+
 
 -- | Execute action, restoring the current label.
 -- Secrecy of the current label is preserved in the label of the value.
@@ -184,6 +210,40 @@ savePost lpost =  withPolicyModule $ \(LBHPolicyTCB privs) -> do
   lpost' <- untaintLabeledP privs l lpost
   saveLabeledRecord lpost'
     where l = dcLabel dcTrue (dcIntegrity . labelOf $ lpost)
+
+--
+-- Users
+--
+
+-- | Data type describing users
+data User = User { userId       :: UserName  -- ^ UserName
+                 , userFullName :: Text      -- ^ User's full name
+                 , userEmail    :: Text     -- ^ User's email MD5(e-mail)
+                 } deriving (Show, Eq)
+
+instance DCRecord User where
+  fromDocument doc = do
+    uid      <- lookup "_id" doc
+    fullName <- lookup "fullName" doc
+    email <- lookup "email" doc
+    return User { userId       = uid
+                , userFullName = fullName
+                , userEmail    = email }
+                
+  toDocument u = [ "_id"      -: userId u
+                 , "fullName" -: userFullName u
+                 , "email"    -: userEmail u ]
+
+  recordCollection _ = "users"
+
+instance DCLabeledRecord LBHPolicy User where
+  endorseInstance _ = LBHPolicyTCB noPriv
+
+
+
+--
+-- Misc
+--
   
 
 -- | Execute a database action against the posts DB.
@@ -206,3 +266,25 @@ lookupTyped n d = case lookup n d of
           Just i -> return i
           _ -> fail $ "lookupTyped: cannot extract id from " ++ show n
   where maybeRead = fmap fst . listToMaybe . reads
+
+-- Create LBH user from X-Hails header
+currentUser :: Controller (Maybe User)
+currentUser = do
+  mu <- getHailsUser
+  case mu of
+    Nothing -> return Nothing
+    Just u -> liftLIO $ withPolicyModule $ \(LBHPolicyTCB priv) -> do
+      mres <- findByP priv "users" "_id" u
+      case mres of
+        Just usr -> return (Just usr)
+        Nothing -> do insertRecordP priv $ newUser u
+                      return . Just $ newUser u
+    where newUser u = User { userId = u
+                           , userFullName = T.empty
+                           , userEmail = T.empty }
+
+-- | Execute action with authenticated user (or force auth)
+withAuthUser :: (User -> Controller Response) -> Controller Response
+withAuthUser act = withUserOrDoAuth $ const $ do
+  mu <- currentUser
+  maybe (return serverError) act mu

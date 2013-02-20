@@ -1,0 +1,10 @@
+
+ul#index-users li {
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
+}
+
+ul#index-users li:hover {
+  background-color: #e5e5e5;
+}

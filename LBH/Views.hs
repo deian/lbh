@@ -8,8 +8,10 @@ import           Control.Monad
 import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.ByteString.Lazy.Char8 as L8
 import           Data.Monoid (mempty)
 import           Data.Time
+import qualified Data.Digest.Pure.MD5 as MD5
 import           Hails.Web hiding (body)
 import           Hails.HttpServer.Types
 import           Text.Blaze.Html5
@@ -24,7 +26,7 @@ import qualified Text.Pandoc.Highlighting as P
 
 import Debug.Trace
 
-respondHtml :: Maybe UserName -> Html -> Response
+respondHtml :: Maybe User -> Html -> Response
 respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
   head $ do
     title "Learn By Hacking"
@@ -42,10 +44,13 @@ respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
               li $ a ! href "/login" $ do
                span ! class_ "icon-user icon-white" $ ""
                " Login"
-            Just u -> li ! class_ "pull-right" $ a ! href "#" $ do
-                        img ! src "https://secure.gravatar.com/avatar/?s=14"
-                        " "
-                        toHtml u
+            Just u -> li ! class_ "pull-right" $
+              a ! href (toValue $ "/users/" `T.append` userId u) $ do
+                img ! src (toValue $ T.concat [
+                  "https://secure.gravatar.com/avatar/"
+                  , md5 (userEmail u), "?s=16"])
+                " "
+                toHtml (userId u)
      div ! class_ "container" $ content
 
 stylesheet :: String -> Html
@@ -56,7 +61,7 @@ stylesheet uri = link ! rel "stylesheet"
 -- Posts
 --
 
-newPost :: UserName -> Html
+newPost :: User -> Html
 newPost usr = do
   stylesheet "/static/css/application/posts.css"
   h1 $ "Create a new post"
@@ -64,7 +69,7 @@ newPost usr = do
     form ! action "/posts" ! method "POST" ! id "newPost" $ do
       div $ do
         input ! type_ "hidden" ! name "owner"
-              ! value (toValue usr)
+              ! value (toValue $ userId usr)
       div $ do
         label ! for "title" $ "Title:"
         input ! class_ "span12" ! type_ "text"
@@ -80,8 +85,8 @@ newPost usr = do
       div ! class_ "btn-group" $ do
         input ! type_ "submit" ! class_ "btn" ! value "Create"
 
-editPost :: UserName -> Post -> Html
-editPost usr post = do
+editPost :: Post -> Html
+editPost post = do
   stylesheet "/static/css/application/posts.css"
   script ! src "/static/js/application/posts.js" $ ""
   h1 $ "Edit post"
@@ -130,7 +135,7 @@ editPost usr post = do
         ! dataAttribute "src" (toValue $ "/posts/" ++ (show $ getPostId post))
         $ ""
 
-showPost :: Maybe UserName -> Post -> Html
+showPost :: Maybe User -> Post -> Html
 showPost muser post = do
   h1 $ toHtml $ postTitle post
   -- Include post header
@@ -144,7 +149,7 @@ showPost muser post = do
         i ! class_ "icon-user" $ ""
         " "
         toHtml $ postOwner post
-      when (muser == Just (postOwner post)) $ do
+      when (userId `liftM` muser == Just (postOwner post)) $ do
         li $ "|"
         li $ a ! href (toValue $ "/posts/" ++ (show $ getPostId post)
                               ++ "/edit") $ do
@@ -164,8 +169,8 @@ showPost muser post = do
                          , P.writerHtml5          = True
                          , P.writerExtensions     = P.githubMarkdownExtensions }
 
-indexPosts :: Maybe UserName -> [Post] -> Html
-indexPosts musr ps = do
+indexPosts :: Maybe User -> [(User,Post)] -> Html
+indexPosts musr ups = do
   stylesheet "/static/css/application/posts.css"
   h1 $ "Posts"
   when (isJust musr) $ do
@@ -175,12 +180,13 @@ indexPosts musr ps = do
   hr
   div $ do
     ul ! class_ "media-list " ! id "index-posts" $ do
-      forM_ ps $ \post -> do
+      forM_ ups $ \(user,post) -> do
         let postUrl = "/posts/" ++ show (getPostId post)
         li ! class_ "media"
            ! onclick (toValue $ "location.href=\'" ++ postUrl ++ "\'") $ do
           img ! class_ "pull-left media-object"
-              ! src "https://secure.gravatar.com/avatar/?s=48"
+              ! src (toValue $ T.concat ["https://secure.gravatar.com/avatar/"
+                                        , md5 (userEmail user), "?s=48"])
           div ! class_ "media-body" $ do
               h4 ! class_ "media-heading" $ do
                 a ! href (toValue postUrl) $ toHtml (postTitle post)
@@ -190,7 +196,6 @@ indexPosts musr ps = do
                    li $ "|"
                    li $ a ! href (toValue $ "/users/" `T.append` postOwner post)
                           $ toHtml $ postOwner post
-                   unless (postIsPublic post) $ do
                    li $ "|"
                    li $ a ! href "#"
                           ! dataAttribute "toggle" "tooltip"
@@ -203,9 +208,92 @@ indexPosts musr ps = do
                                  
 
 --
--- Helper functions
+-- Users
 --
 
+indexUsers :: Maybe User -> [User] -> Html
+indexUsers musr ps = do
+  stylesheet "/static/css/application/users.css"
+  h1 $ "Users"
+  hr
+  div $ ul ! class_ "media-list" ! id "index-users" $ do
+    forM_ ps $ \user -> do
+      let userUrl = "/users/" `T.append` userId user
+      li ! class_ "media"
+         ! onclick (toValue $ T.concat ["location.href=\'",userUrl,"\'"]) $ do
+        img ! class_ "pull-left media-object"
+            ! src (toValue $ T.concat ["https://secure.gravatar.com/avatar/"
+                                      , md5 (userEmail user), "?s=48"])
+        div ! class_ "media-body" $ do
+            h4 ! class_ "media-heading" $ do
+              a ! href (toValue userUrl) $ toHtml $
+               T.concat $ (userId user) :
+                 if T.null (userFullName user)
+                   then []
+                   else [" [ ", userFullName user, " ] "]
+            when (musr == Just user) $ do
+              a ! class_ "pull-right"
+                ! href (toValue $ userUrl `T.append` "/edit") $ do
+                 i ! class_ "icon-wrench" $ ""
+                 " edit "
+
+showUser :: User -> [Post] -> Bool -> Html
+showUser user ps isCurrentUser = do
+  ul ! class_ "media-list " $ do
+    li ! class_ "media" $ do
+      img ! class_ "pull-left media-object"
+          ! src (toValue $ T.concat ["https://secure.gravatar.com/avatar/"
+                                    , md5 (userEmail user), "?s=48"])
+      div ! class_ "media-body" $ do
+          h4 ! class_ "media-heading" $ toHtml $ userId user
+          toHtml $ userFullName user
+  when (isCurrentUser) $ do
+    a ! class_ "btn btn-primary"
+      ! href (toValue $ T.concat ["/users/", userId user, "/edit"]) $ do
+      i ! class_ "icon-wrench icon-white" $ ""
+      " Edit account"
+  hr
+  ul ! class_ "nav nav-pills nav-stacked" $ do
+    forM_ ps $ \post -> do
+      let postUrl = "/posts/" ++ show (getPostId post)
+      li $ do
+          a ! href (toValue postUrl) $ do
+            i ! class_ (snd $ privInfo post) $ ""
+            " "
+            toHtml $ postTitle post
+            span ! class_ "pull-right" $ toHtml $ showDate (postDate post)
+  where privInfo p = if postIsPublic p
+                       then ("Public post", "icon-globe")
+                       else ("Private post", "icon-lock")
+
+editUser :: User -> Html
+editUser usr = do
+  h1 $ toHtml (userId usr)
+  div $ do
+    form ! action "/users" ! method "POST" ! id "editUser" $ do
+      div $ do
+        input ! type_ "hidden" ! name "_method" ! value "PUT"
+        input ! type_ "hidden" ! name "_id"
+              ! value (toValue $ userId usr)
+      div $ do
+        label ! for "fullName" $ "Full name:"
+        input ! class_ "span4" ! type_ "text"
+              ! name "fullName" ! id "fullName"
+              ! value (toValue $ userFullName usr)
+      div $ do
+        label ! for "gravatar" $ "Email:"
+        input ! class_ "span4" ! type_ "email"
+              ! id "editUser-email"
+              ! name "email" ! id "email"
+              ! value (toValue $ userEmail usr)
+      div ! class_ "btn-group" $ do
+        input ! type_ "submit" ! class_ "btn btn-primary" ! value "Done"
+        input ! type_ "reset" ! class_ "btn" ! value "Reset"
+
+
+--
+-- Helper functions
+--
 
 
 -- | Show time
@@ -244,3 +332,7 @@ lines' ps | T.null ps  = []
     where (h,t)    = T.span notEOL ps
           notEOL c = c /= '\n' && c /= '\r'
 {-# INLINE lines' #-}
+
+-- | MD5 hash
+md5 :: Text -> Text
+md5 = T.pack . show . MD5.md5 . L8.pack . T.unpack
