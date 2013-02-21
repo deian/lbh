@@ -7,7 +7,7 @@ module LBH.MP ( withLBHPolicy
                 -- * Posts
               , PostId
               , getPostId
-              , Post(..), labeledRequestToPost, partiallyFillPost 
+              , Post(..), Tag, labeledRequestToPost, partiallyFillPost 
               , savePost
                 -- * Users
               , User(..), currentUser, withAuthUser
@@ -72,6 +72,7 @@ instance PolicyModule LBHPolicy where
                          else this \/ owner
            writers ==> this \/ owner
          field "owner" $ searchable
+         field "tags"  $ searchable
        -- = Users ===================================================
        collection "users" $ do
          access $ do
@@ -104,6 +105,9 @@ type PostId  = Maybe ObjectId
 getPostId :: Post -> ObjectId
 getPostId = fromJust . postId
 
+-- | A tag id is just a string
+type Tag = Text
+
 -- | Data type encoding posts.
 data Post = Post { postId          :: PostId
                  , postTitle       :: Text
@@ -112,13 +116,15 @@ data Post = Post { postId          :: PostId
                  , postBody        :: Text
                  , postIsPublic    :: Bool
                  , postDate        :: UTCTime
+                 , postTags        :: [Tag]
                  } deriving (Show, Eq)
 
 
 instance DCRecord Post where
   fromDocument doc = do
     let pid      = lookupObjId "_id" doc
-        isPublic =  fromMaybe False $ lookupBool "isPublic" doc
+        isPublic = fromMaybe False $ lookupBool "isPublic" doc
+        tags     = fromMaybe [] $ (lookupTyped "tags"  doc :: Maybe [Tag])
     title        <- lookup "title" doc
     owner        <- lookup "owner" doc
     description  <- lookup "description" doc
@@ -130,19 +136,19 @@ instance DCRecord Post where
                 , postDescription = description
                 , postBody        = body
                 , postDate        = date
-                , postIsPublic    = isPublic }
+                , postIsPublic    = isPublic
+                , postTags        = tags }
                 
   toDocument p = 
     let pid = postId p
-        pre = if isJust pid
-               then ["_id" -: fromJust pid]
-               else []
+        pre = maybe [] (\i -> ["_id" -: i]) $ postId p
     in pre ++ [ "title"       -: postTitle p
               , "owner"       -: postOwner p
               , "description" -: postDescription p
               , "body"        -: postBody p
               , "date"        -: postDate p
-              , "isPublic"    -: postIsPublic p ]
+              , "isPublic"    -: postIsPublic p
+              , "tags"        -: postTags p ]
 
   recordCollection _ = "posts"
 
@@ -199,10 +205,12 @@ partiallyFillPost ldoc = withPolicyModule $ \(LBHPolicyTCB p) -> do
           res <- liftLIO $ toLabeledTCB p (labelOf ldoc') $ do
             doc' <- unlabel ldoc'
             -- merge new (safe) fields and convert it to a record
-            fromDocument $ (safeFields `include` doc) `merge` doc'
+            fromDocument $ (safeFields `include` doc) `merge`
+                           ["tags" -: ([]::[Tag])] `merge` -- delete (hack)
+                           doc'
           return (Just res)
         _ -> return Nothing
-  where safeFields = ["isPublic", "title", "description", "body"]
+  where safeFields = ["isPublic", "title", "description", "body", "tags"]
 
 -- | Save post, by first declassifying it
 savePost :: DCLabeled Post -> DC ()
@@ -238,7 +246,6 @@ instance DCRecord User where
 
 instance DCLabeledRecord LBHPolicy User where
   endorseInstance _ = LBHPolicyTCB noPriv
-
 
 
 --

@@ -5,6 +5,7 @@
 module LBH.Controllers where
 
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.Text as T
 import           Data.Maybe
 
@@ -12,6 +13,7 @@ import           Control.Monad
 
 import           LIO
 import           LIO.DCLabel
+import           LIO.Concurrent
 
 import           Hails.Data.Hson (ObjectId, labeledRequestToHson)
 import           Hails.Database
@@ -35,6 +37,7 @@ server = mkRouter $ do
   routeTop $ redirectTo "/posts/"
   routeName "posts" postsController
   routeName "users" usersController
+  Frank.get "/tags/:tag" tagsController
   Frank.post "/exec" execController
   Frank.get "/login" $ withAuthUser $ \_ -> redirectBack
 
@@ -52,15 +55,15 @@ postsController = do
       return (fromMaybe (User { userId = postOwner p
                               , userFullName = T.empty
                               , userEmail = T.empty }) u, p)
-    return $ respondHtml mu $ indexPosts mu ups
+    return $ respondHtml mu $ indexPosts "All posts" mu ups
   REST.new $ withAuthUser $ \u ->
     return $ respondHtml (Just u) (newPost u)
   REST.create $ withAuthUser $ const $ do
     lreq <- request 
     liftLIO . withLBHPolicy $ do
       lpost <- liftLIO $ labeledRequestToPost lreq
-      void $ insertLabeledRecord lpost
-      return $ redirectTo $ "/posts/"
+      _id <- insertLabeledRecord lpost
+      return $ redirectTo $ "/posts/" ++ (show _id)
   REST.show $ do
     mu <- currentUser
     (Just pid) <- queryParam "id"
@@ -79,9 +82,11 @@ postsController = do
     mlpost <- liftLIO $ partiallyFillPost ldoc
     case mlpost of
       Nothing -> return serverError
-      Just lpost -> do liftLIO $ savePost lpost
-                       post <- unlabel lpost
-                       return $ redirectTo $ "/posts/" ++ show (getPostId post)
+      Just lpost -> do
+        liftLIO $ savePost lpost
+        post <- unlabel lpost
+        let _id = getPostId post
+        return $ redirectTo $ "/posts/" ++ show _id
 
 --
 -- Users
@@ -134,3 +139,22 @@ execController = do
               Just c -> do
                 r <- liftLIO $ execCode c
                 return $ ok "text/json" (encode r)
+
+--
+-- Search
+--
+
+tagsController :: Controller Response
+tagsController = do
+  mu <- currentUser
+  Just tag <- queryParam "tag"
+  ups <- liftLIO . withLBHPolicy $ do
+    let qry :: BsonDocument
+        qry = ["$in" -: [tag]]
+    ps <- findAll (select ["tags" -: qry] "posts")
+    forM ps $ \p-> do
+      u <- findBy  "users" "_id" (postOwner p)
+      return (fromMaybe (User { userId = postOwner p
+                              , userFullName = T.empty
+                              , userEmail = T.empty }) u, p)
+  return $ respondHtml mu $ indexPosts (S8.unpack tag ++ " posts") mu ups

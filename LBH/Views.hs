@@ -66,7 +66,11 @@ stylesheet uri = link ! rel "stylesheet"
 
 newPost :: User -> Html
 newPost usr = do
+  stylesheet "/static/css/bootstrap-tagmanager.css"
   stylesheet "/static/css/application/posts.css"
+  script ! src "/static/js/bootstrap-tagmanager.js" $ ""
+  script ! src "/static/js/application/posts.js" $ ""
+  --
   h1 $ "Create a new post"
   div $ do
     form ! action "/posts" ! method "POST" ! id "newPost" $ do
@@ -77,6 +81,7 @@ newPost usr = do
         label ! for "title" $ "Title:"
         input ! class_ "span12" ! type_ "text"
               ! name "title" ! id "title"
+              ! placeholder "Writing Haskell for Fun and Profit"
       div $ do
         label ! for "description" $ "Description:"
         input ! class_ "span12" ! type_ "text"
@@ -85,13 +90,27 @@ newPost usr = do
         label ! for "body" $ "Body:"
         textarea ! class_ "span12"
                  ! name "body" ! id "body" $ ""
+      div $ do
+        label ! for "tags" $ do
+          "Tags ("
+          a ! href "#"
+            ! dataAttribute "toggle" "tooltip"
+            ! A.title "All tags are public"
+            $ "?"
+          "):"
+        input ! class_ "tagManager" ! type_ "text"
+              ! name "tagsAggr"
+              ! placeholder "haskell, fun, profit, ..."
       div ! class_ "btn-group" $ do
         input ! type_ "submit" ! class_ "btn" ! value "Create"
 
 editPost :: Post -> Html
 editPost post = do
+  stylesheet "/static/css/bootstrap-tagmanager.css"
   stylesheet "/static/css/application/posts.css"
+  script ! src "/static/js/bootstrap-tagmanager.js" $ ""
   script ! src "/static/js/application/posts.js" $ ""
+  --
   h1 $ "Edit post"
   div ! id "post-edit" $ do
     form ! action "/posts" ! method "POST" ! id "editPost" $ do
@@ -113,6 +132,16 @@ editPost post = do
         label ! for "body" $ "Body:"
         textarea ! class_ "span12"
                  ! name "body" ! id "body" $ toHtml $ postBody post
+      div $ do
+        label ! for "tags" $ "Tags:"
+        input ! class_ "tagManager" ! type_ "text"
+              ! name "tagsAggr"
+              ! if (null $ postTags post)
+                 then placeholder "haskell, fun, profit, ..."
+                 else mempty
+        input ! type_ "hidden"
+              ! id "prefilled-tagsAggr"
+              ! value (toValue $ T.intercalate "," $ postTags post)
       div ! class_ "btn-group" $ do
         a ! class_ "btn" ! id "post-save-btn" $ do
           i ! class_ "icon-download-alt" $ ""
@@ -143,7 +172,7 @@ showPost muser post = do
   stylesheet "/static/css/application/posts.css"
   script ! src "/static/js/application/posts.js" $ ""
   -- Include post header
-  div ! id "post-header" $ do
+  div ! class_ "page-header" ! id "post-header" $ do
     h1 $ toHtml $ postTitle post
     ul ! class_ "inline" $ do
       li $ do
@@ -160,7 +189,12 @@ showPost muser post = do
                               ++ "/edit") $ do
           i ! class_ "icon-edit" $ ""
           " edit"
-    hr
+      unless (null $ postTags post) $ ul ! class_ "inline pull-right" $ do
+        li $ i ! class_ "icon-tags" $ ""
+        forM_ (zip [1..10] (postTags post)) $ \(_,t) -> do
+          li ! class_ "small" $ do
+             a ! href (toValue $ "/tags/" `T.append` t) $ toHtml t
+          li $ ""
   div ! id "post-body" $ do
     -- Include kate syntax highlighting css
     style $ toHtml $ P.styleToCss P.kate
@@ -175,39 +209,43 @@ showPost muser post = do
                          , P.writerHtml5          = True
                          , P.writerExtensions     = P.githubMarkdownExtensions }
 
-indexPosts :: Maybe User -> [(User,Post)] -> Html
-indexPosts musr ups = do
+indexPosts :: String -> Maybe User -> [(User,Post)] -> Html
+indexPosts idxTitle musr ups = do
   stylesheet "/static/css/application/posts.css"
-  h1 $ "Posts"
-  when (isJust musr) $ do
-    a ! class_ "btn btn-primary" ! href "new" $ do
-      i ! class_ "icon-plus icon-white" $ ""
-      " New Post"
-  hr
-  div $ do
-    ul ! class_ "media-list " ! id "index-posts" $ do
-      forM_ ups $ \(user,post) -> do
-        let postUrl = "/posts/" ++ show (getPostId post)
-        li ! class_ "media"
-           ! onclick (toValue $ "location.href=\'" ++ postUrl ++ "\'") $ do
-          img ! class_ "pull-left media-object"
-              ! src (toValue $ T.concat ["https://secure.gravatar.com/avatar/"
-                                        , md5 (userEmail user), "?s=48"])
-          div ! class_ "media-body" $ do
-              h4 ! class_ "media-heading" $ do
-                a ! href (toValue postUrl) $ toHtml (postTitle post)
-              div ! class_ "pull-right" $ do
-                ul ! class_ "inline" $ do
-                   li $ toHtml $ showDate (postDate post)
-                   li $ "|"
-                   li $ a ! href (toValue $ "/users/" `T.append` postOwner post)
-                          $ toHtml $ postOwner post
-                   li $ "|"
-                   li $ a ! href "#"
-                          ! dataAttribute "toggle" "tooltip"
-                          ! A.title (fst $ privInfo post) $
-                            i ! class_ (snd $ privInfo post) $ ""
-              div $ toHtml $ postDescription post
+  script ! src "/static/js/application/posts.js" $ ""
+  div ! class_ "page-header" $ do
+    h1 $ toHtml $ idxTitle
+    when (isJust musr) $ do
+      a ! class_ "btn btn-primary" ! href "/posts/new" $ do
+        i ! class_ "icon-plus icon-white" $ ""
+        " New Post"
+  div $ if null ups
+    then p $ "Sorry, no posts... :-("
+    else ul ! class_ "media-list " ! id "index-posts" $ do
+           forM_ ups $ \(user,post) -> do
+             let postUrl = "/posts/" ++ show (getPostId post)
+             li ! class_ "media"
+                ! onclick (toValue $ "location.href=\'" ++ postUrl ++ "\'") $ do
+               img ! class_ "pull-left media-object"
+                   ! src (toValue $ T.concat
+                              [ "https://secure.gravatar.com/avatar/"
+                              , md5 (userEmail user), "?s=48"])
+               div ! class_ "media-body" $ do
+                   h4 ! class_ "media-heading" $ do
+                     a ! href (toValue postUrl) $ toHtml (postTitle post)
+                   div ! class_ "pull-right" $ do
+                     ul ! class_ "inline" $ do
+                        li $ toHtml $ showDate (postDate post)
+                        li $ "|"
+                        li $ a ! href (toValue $ "/users/" `T.append`
+                                                 postOwner post)
+                               $ toHtml $ postOwner post
+                        li $ "|"
+                        li $ a ! href "#"
+                               ! dataAttribute "toggle" "tooltip"
+                               ! A.title (fst $ privInfo post) $
+                                 i ! class_ (snd $ privInfo post) $ ""
+                   div $ toHtml $ postDescription post
   where privInfo p = if postIsPublic p
                        then ("Public post", "icon-globe")
                        else ("Private post", "icon-lock")
@@ -220,8 +258,8 @@ indexPosts musr ups = do
 indexUsers :: Maybe User -> [User] -> Html
 indexUsers musr ps = do
   stylesheet "/static/css/application/users.css"
-  h1 $ "Users"
-  hr
+  div ! class_ "page-header" $ do
+    h1 $ "Users"
   div $ ul ! class_ "media-list" ! id "index-users" $ do
     forM_ ps $ \user -> do
       let userUrl = "/users/" `T.append` userId user
@@ -245,20 +283,20 @@ indexUsers musr ps = do
 
 showUser :: User -> [Post] -> Bool -> Html
 showUser user ps isCurrentUser = do
-  ul ! class_ "media-list " $ do
-    li ! class_ "media" $ do
-      img ! class_ "pull-left media-object"
-          ! src (toValue $ T.concat ["https://secure.gravatar.com/avatar/"
-                                    , md5 (userEmail user), "?s=48"])
-      div ! class_ "media-body" $ do
-          h4 ! class_ "media-heading" $ toHtml $ userId user
-          toHtml $ userFullName user
-  when (isCurrentUser) $ do
-    a ! class_ "btn btn-primary"
-      ! href (toValue $ T.concat ["/users/", userId user, "/edit"]) $ do
-      i ! class_ "icon-wrench icon-white" $ ""
-      " Edit account"
-  hr
+  div ! class_ "page-header" $ do
+    ul ! class_ "media-list " $ do
+      li ! class_ "media" $ do
+        img ! class_ "pull-left media-object"
+            ! src (toValue $ T.concat ["https://secure.gravatar.com/avatar/"
+                                      , md5 (userEmail user), "?s=48"])
+        div ! class_ "media-body" $ do
+            h4 ! class_ "media-heading" $ toHtml $ userId user
+            toHtml $ userFullName user
+    when (isCurrentUser) $ do
+      a ! class_ "btn btn-primary"
+        ! href (toValue $ T.concat ["/users/", userId user, "/edit"]) $ do
+        i ! class_ "icon-wrench icon-white" $ ""
+        " Edit account"
   ul ! class_ "nav nav-pills nav-stacked" $ do
     forM_ ps $ \post -> do
       let postUrl = "/posts/" ++ show (getPostId post)
