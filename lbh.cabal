@@ -26,6 +26,7 @@ Library
    ,blaze-html        >= 0.5.1.3
    ,http-types        >= 0.7
    ,pureMD5           >= 2.1.2.1
+   ,lio-cjail         >= 0.1
 
   Other-Modules: LBH.Controllers
                  LBH.Views

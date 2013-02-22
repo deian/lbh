@@ -12,9 +12,7 @@ import           LIO
 import           LIO.DCLabel
 import           System.Exit
 
--- TODO: Use cjail 
-import System.Process
-import LIO.TCB (ioTCB)
+import           LIO.CJail
 
 -- | Code from clients
 data Code = Code { codeId     :: String
@@ -38,7 +36,8 @@ instance ToJSON Result where
 
 execCode :: Code -> DC Result
 execCode c = do
-  (code,out,_) <- ioTCB $ readProcessWithExitCode "activeHaskell" [] (L8.unpack $ codeSource c)
+  (code,out,_) <- inCJail $
+     readProcessWithExitCode "activeHaskell" [] (L8.unpack $ codeSource c)
   let rc = if code == ExitSuccess then 0 else -1
   return $ Result { resultId    = codeId c
                   , resultCode  = rc
