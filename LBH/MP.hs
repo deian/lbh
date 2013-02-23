@@ -216,7 +216,14 @@ partiallyFillPost ldoc = withPolicyModule $ \(LBHPolicyTCB p) -> do
 savePost :: DCLabeled Post -> DC ()
 savePost lpost =  withPolicyModule $ \(LBHPolicyTCB privs) -> do
   lpost' <- untaintLabeledP privs l lpost
-  saveLabeledRecord lpost'
+  post <- unlabelP privs lpost
+  (Just lpost2) <- findOne (select ["_id" -: postId post] "posts")
+  
+  -- Use privs if integrity stays the same, but we're making
+  -- the post private
+  if l `canFlowTo` labelOf lpost2
+    then saveLabeledRecordP privs lpost'
+    else saveLabeledRecord lpost'
     where l = dcLabel dcTrue (dcIntegrity . labelOf $ lpost)
 
 --

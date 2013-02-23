@@ -107,6 +107,7 @@ $(document).ready(function() {
   						});
   	});
   
+
     $("#post-make-public-btn").click( function () {
 				set_tags("#editPost");
   			$.ajax({ url  : '/posts'
@@ -114,9 +115,23 @@ $(document).ready(function() {
   		         , data : $("#editPost").serialize()+"&isPublic=True"}
   						).done(function() {
   								$("#post-make-public-btn").hide();
+  								$("#post-make-private-btn").show();
 									refresh_preview();
   						});
   	});
+
+    $("#post-make-private-btn").click( function () {
+				set_tags("#editPost");
+  			$.ajax({ url  : '/posts'
+  		         , type : 'PUT'
+  		         , data : $("#editPost").serialize()+"&isPublic=False"}
+  						).done(function() {
+  								$("#post-make-private-btn").hide();
+  								$("#post-make-public-btn").show();
+									refresh_preview();
+  						});
+  	});
+
   })();
 
 	(function () { 

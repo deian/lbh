@@ -147,16 +147,26 @@ editPost post = do
         a ! class_ "btn" ! id "post-save-btn" $ do
           i ! class_ "icon-download-alt" $ ""
           " Save"
-        unless (postIsPublic post) $ do
-          a ! class_ "btn"
-            ! id "post-make-public-btn" $ do
-            i ! class_ "icon-share" $ ""
-            " Make Public"
         a ! class_ "btn"
           ! id "post-preview-btn"
           ! dataAttribute "toggle" "button" $ do
             i ! class_ "icon-eye-open" $ ""
             " Preview"
+      div ! class_ "pull-right" $ do
+        a ! class_ "btn"
+          ! (if postIsPublic post
+               then A.style "display: none"
+               else mempty)
+          ! id "post-make-public-btn" $ do
+            i ! class_ "icon-globe" $ ""
+            " Make public"
+        a ! class_ "btn"
+          ! (if not $ postIsPublic post
+               then A.style "display: none"
+               else mempty)
+          ! id "post-make-private-btn" $ do
+            i ! class_ "icon-lock" $ ""
+            " Make private"
   div ! id "post-preview" ! A.style "display: none" $ do
     ul ! class_ "breadcrumb" $ do
        li $ "Preview..."
