@@ -12,10 +12,12 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Lazy.Char8 as L8
 import           Data.Monoid (mempty)
 import           Data.Time
+import           Data.Aeson ((.=), toJSON)
+import qualified Data.Aeson as Aeson
 import qualified Data.Digest.Pure.MD5 as MD5
 import           Hails.Web hiding (body)
 import           Hails.HttpServer.Types
-import           Text.Blaze.Html5
+import           Text.Blaze.Html5 hiding (Tag)
 import           Text.Blaze.Html5.Attributes hiding (label, form, span, title, style)
 import qualified Text.Blaze.Html5.Attributes as A
 import           Text.Blaze.Html.Renderer.Utf8
@@ -101,6 +103,7 @@ newPost usr = do
           "):"
         input ! class_ "tagManager" ! type_ "text"
               ! name "tagsAggr"
+              ! autocomplete "off"
               ! placeholder "haskell, fun, profit, ..."
       div ! class_ "btn-group" $ do
         input ! type_ "submit" ! class_ "btn" ! value "Create"
@@ -137,6 +140,7 @@ editPost post = do
         label ! for "tags" $ "Tags:"
         input ! class_ "tagManager" ! type_ "text"
               ! name "tagsAggr"
+              ! autocomplete "off"
               ! if (null $ postTags post)
                  then placeholder "haskell, fun, profit, ..."
                  else mempty
@@ -345,6 +349,31 @@ editUser usr = do
         input ! type_ "submit" ! class_ "btn btn-primary" ! value "Done"
         input ! type_ "reset" ! class_ "btn" ! value "Reset"
 
+--
+-- Tags
+--
+
+indexTags :: [TagEntry] -> Html
+indexTags ts = do
+  div ! class_ "page-header" $ do
+    h1 $ "Tags"
+  div $ if null ts
+    then p $ "Sorry, no tags... :-("
+    else table ! class_ "table table-hover table-condensed" $ do
+         thead $ tr $ do
+           th $ "#"
+           th $ "Tag"
+           th $ "Count"
+         tbody $ do
+           forM_ (zip [1..] ts) $ \(nr,tag) -> do
+             let tagUrl = "/tags/" ++ T.unpack (tagName tag)
+             tr ! onclick (toValue $ "location.href=" ++ show tagUrl )$ do
+               td $ toHtml (nr :: Int)
+               td $ toHtml $ tagName tag
+               td $ toHtml $ tagCount tag
+
+tagsToJSON :: [TagEntry] -> Aeson.Value
+tagsToJSON ts = toJSON $ Aeson.object [ "tags" .= ts]
 
 --
 -- Helper functions

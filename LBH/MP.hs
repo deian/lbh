@@ -7,10 +7,12 @@ module LBH.MP ( withLBHPolicy
                 -- * Posts
               , PostId
               , getPostId
-              , Post(..), Tag, labeledRequestToPost, partiallyFillPost 
+              , Post(..), labeledRequestToPost, partiallyFillPost 
               , savePost
                 -- * Users
               , User(..), currentUser, withAuthUser
+                -- * Tags
+              , Tag, TagEntry(..)
               ) where
 
 import           Prelude hiding (lookup)
@@ -21,6 +23,8 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as S8
 import           Data.Typeable
 import           Data.Time.Clock (UTCTime)
+import qualified Data.List as List
+import           Data.Aeson (ToJSON(..), (.=), object)
 
 import           Control.Monad
 
@@ -87,6 +91,17 @@ instance PolicyModule LBHPolicy where
            readers ==> anybody
            writers ==> this \/ user
          field "fullName" $ searchable
+       -- = Tags ====================================================
+       collection "tags" $ do
+         access $ do
+           readers ==> anybody
+           writers ==> anybody
+         clearance $ do
+           secrecy   ==> this
+           integrity ==> anybody
+         document $ const $ do
+           readers ==> anybody
+           writers ==> anybody
        --
      return $ LBHPolicyTCB priv
        where this = privDesc priv
@@ -217,13 +232,28 @@ savePost :: DCLabeled Post -> DC ()
 savePost lpost =  withPolicyModule $ \(LBHPolicyTCB privs) -> do
   lpost' <- untaintLabeledP privs l lpost
   post <- unlabelP privs lpost
-  (Just lpost2) <- findOne (select ["_id" -: postId post] "posts")
-  
+  (Just lpostE) <- findOne (select ["_id" -: postId post] "posts")
   -- Use privs if integrity stays the same, but we're making
   -- the post private
-  if l `canFlowTo` labelOf lpost2
-    then saveLabeledRecordP privs lpost'
-    else saveLabeledRecord lpost'
+  let p = if l `canFlowTo` labelOf lpostE
+            then privs else noPriv
+  saveLabeledRecordP p lpost'
+
+  -- update tags
+  postE <- unlabel lpostE >>= fromDocument
+  let tags = List.nub $ postTags post ++ postTags postE
+      cnts = map (\t -> case () of
+                         _ | t `elem`    postTags postE &&
+                             t `notElem` postTags post     -> -1
+                         _ | t `notElem` postTags postE &&
+                             t `elem`    postTags post     ->  1
+                         _                                 ->  0) tags
+  forM_ (zip tags cnts) $ \(t, c) -> do
+    md <- findBy "tags" "_id" t
+    case md of
+      Nothing -> void $ insertRecordP p TagEntry { tagName = t, tagCount = 1 }
+      Just t' -> saveRecordP p $ t' { tagCount = tagCount t' + c }
+  --
     where l = dcLabel dcTrue (dcIntegrity . labelOf $ lpost)
 
 --
@@ -233,7 +263,7 @@ savePost lpost =  withPolicyModule $ \(LBHPolicyTCB privs) -> do
 -- | Data type describing users
 data User = User { userId       :: UserName  -- ^ UserName
                  , userFullName :: Text      -- ^ User's full name
-                 , userEmail    :: Text     -- ^ User's email MD5(e-mail)
+                 , userEmail    :: Text      -- ^ User's email MD5(e-mail)
                  } deriving (Show, Eq)
 
 instance DCRecord User where
@@ -254,6 +284,29 @@ instance DCRecord User where
 instance DCLabeledRecord LBHPolicy User where
   endorseInstance _ = LBHPolicyTCB noPriv
 
+--
+-- Tags
+--
+
+-- | Data type describing tag entries
+data TagEntry = TagEntry { tagName  :: Tag
+                         , tagCount :: Int
+                         } deriving (Show, Eq)
+                     
+instance ToJSON TagEntry where
+  toJSON (TagEntry n c) = object [ "tag"   .= n
+                                 , "count" .= c ]
+
+instance DCRecord TagEntry where
+  fromDocument doc = do
+    t <- lookup "_id" doc
+    c <- lookup "count" doc
+    return TagEntry { tagName = t, tagCount = c }
+                
+  toDocument t = [ "_id"   -: tagName t
+                 , "count" -: tagCount t ]
+
+  recordCollection _ = "tags"
 
 --
 -- Misc

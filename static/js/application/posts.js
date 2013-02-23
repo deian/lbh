@@ -16,7 +16,11 @@ $(document).ready(function() {
 					pre = $("#prefilled-tagsAggr").val();
 			}
 			$(".tagManager").tagsManager( { maxTags : 10 /* fake limit*/
-																		, prefilled : pre });
+																		, prefilled : pre
+																		, typeahead : true
+																		, typeaheadAjaxSource : '/tags'
+																		//, typeaheadAjaxPolling : true
+																		});
 	}
 
 	var set_tags = function(postId) {
@@ -157,7 +161,7 @@ $(document).ready(function() {
   							// execute code
   							$.ajax({ url:'/exec'
   										 , type: 'POST'
-  										 , contentType: 'text/json'
+  										 , contentType: 'application/json'
   										 , data : JSON.stringify({ "id": id
   																						 , "lang": $("#raw-"+id).data("lang")
   																						 , "source": $("#raw-"+id).text()})

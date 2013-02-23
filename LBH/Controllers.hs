@@ -37,7 +37,7 @@ server = mkRouter $ do
   routeTop $ redirectTo "/posts/"
   routeName "posts" postsController
   routeName "users" usersController
-  Frank.get "/tags/:tag" tagsController
+  routeName "tags"   tagsController
   Frank.post "/exec" execController
   Frank.get "/login" $ withAuthUser $ \_ -> redirectBack
 
@@ -63,6 +63,14 @@ postsController = do
     liftLIO . withLBHPolicy $ do
       lpost <- liftLIO $ labeledRequestToPost lreq
       _id <- insertLabeledRecord lpost
+      -- insert tags
+      post <- unlabel lpost
+      forM_ (postTags post) $ \t -> do
+        md <- findBy "tags" "_id" t
+        case md of
+          Nothing -> void $ insertRecord TagEntry { tagName = t, tagCount = 1 }
+          Just t' -> saveRecord $ t' { tagCount = tagCount t' + 1 }
+      --
       return $ redirectTo $ "/posts/" ++ (show _id)
   REST.show $ do
     mu <- currentUser
@@ -85,8 +93,7 @@ postsController = do
       Just lpost -> do
         liftLIO $ savePost lpost
         post <- unlabel lpost
-        let _id = getPostId post
-        return $ redirectTo $ "/posts/" ++ show _id
+        return $ redirectTo $ "/posts/" ++ show (getPostId post)
 
 --
 -- Users
@@ -131,30 +138,40 @@ usersController = do
 execController :: Controller Response
 execController = do
   ct <- requestHeader "content-type"
-  if ct /= Just "text/json"
+  if ct /= Just "application/json"
     then return badRequest
     else do obj <- decode `liftM` body
             case obj of
               Nothing -> return badRequest
               Just c -> do
                 r <- liftLIO $ execCode c
-                return $ ok "text/json" (encode r)
+                return $ ok "application/json" (encode r)
 
 --
 -- Search
 --
 
-tagsController :: Controller Response
+tagsController :: RESTController
 tagsController = do
-  mu <- currentUser
-  Just tag <- queryParam "tag"
-  ups <- liftLIO . withLBHPolicy $ do
-    let qry :: BsonDocument
-        qry = ["$in" -: [tag]]
-    ps <- findAll (select ["tags" -: qry] "posts")
-    forM ps $ \p-> do
-      u <- findBy  "users" "_id" (postOwner p)
-      return (fromMaybe (User { userId = postOwner p
-                              , userFullName = T.empty
-                              , userEmail = T.empty }) u, p)
-  return $ respondHtml mu $ indexPosts (S8.unpack tag ++ " posts") mu ups
+  REST.index $ do
+    mu <- currentUser
+    ts <- liftLIO . withLBHPolicy $ do
+      findAll $ (select [] "tags") { sort = [Asc "count"] }
+    matype <- requestHeader "accept"
+    case matype of
+      Just atype |  "application/json" `S8.isInfixOf` atype ->
+           return $ ok "application/json" (encode $ tagsToJSON ts)
+      _ -> return $ respondHtml mu $ indexTags ts
+  REST.show $ do
+    mu <- currentUser
+    Just tag <- queryParam "id"
+    ups <- liftLIO . withLBHPolicy $ do
+      let qry :: BsonDocument
+          qry = ["$in" -: [tag]]
+      ps <- findAll (select ["tags" -: qry] "posts")
+      forM ps $ \p-> do
+        u <- findBy  "users" "_id" (postOwner p)
+        return (fromMaybe (User { userId = postOwner p
+                                , userFullName = T.empty
+                                , userEmail = T.empty }) u, p)
+    return $ respondHtml mu $ indexPosts (S8.unpack tag ++ " posts") mu ups
