@@ -1,31 +1,35 @@
-module LBH.Utils (extractHaskellCodeBlocks) where
+module LBH.Utils ( lines' ) where
 
-import Text.Pandoc
-import Control.Monad.State
+import           Data.Maybe
+import           Data.Text (Text)
+import qualified Data.Text as T
 
-type M = State Int
 
-extractHaskellCodeBlocks :: Pandoc -> Pandoc
-extractHaskellCodeBlocks (Pandoc i bs) = (flip evalState) 0 $ do
-  bs' <- concat `liftM` forM bs extractFromBlock
-  return $ Pandoc i bs'
-
--- | Currently only handle top-level blocks
-extractFromBlock :: Block -> M [Block]
-extractFromBlock (CodeBlock attrs blk) | isActiveHaskell attrs = do
-  x <- freshVar
-  let _id = "active-haskell-" ++ show x
-  return $ [(CodeBlock (_id , ["haskell","active-haskell"] ,[]) blk)
-           ,(RawBlock "html" $
-              "<div id=\"raw-"++_id++"\" class=\"raw-active-haskell\">"
-              ++ blk ++ "</div>")
-            ]
- where isActiveHaskell = (== ("",["active-haskell"],[]))
-extractFromBlock b = return [b]
-
--- | Generate a fresh variable
-freshVar :: M Int
-freshVar = do
-  i <- get
-  put (i+1)
-  return i
+-- | /O(n)/ Portably breaks a 'Text' up into a list of 'Text's at line
+-- boundaries.
+--
+-- A line boundary is considered to be either a line feed, a carriage
+-- return immediately followed by a line feed, or a carriage return.
+-- This accounts for both Unix and Windows line ending conventions,
+-- and for the old convention used on Mac OS 9 and earlier.
+--
+-- This was grabbed from:
+--
+-- Module      : Data.Text
+-- Copyright   : (c) 2009, 2010, 2011, 2012 Bryan O'Sullivan,
+--               (c) 2009 Duncan Coutts,
+--               (c) 2008, 2009 Tom Harper
+--
+-- License     : BSD-style
+lines' :: Text -> [Text]
+lines' ps | T.null ps  = []
+          | otherwise = h : case T.uncons t of
+                              Nothing -> []
+                              Just (c,t')
+                                  | c == '\n' -> lines' t'
+                                  | c == '\r' -> case T.uncons t' of
+                                                   Just ('\n',t'') -> lines' t''
+                                                   _               -> lines' t'
+    where (h,t)    = T.span notEOL ps
+          notEOL c = c /= '\n' && c /= '\r'
+{-# INLINE lines' #-}

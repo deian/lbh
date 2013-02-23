@@ -124,7 +124,7 @@ $(document).ready(function() {
   	// Show
   	//
   
-  	$.map($(".active-haskell"), function(c_blk) {
+  	$.map($(".active-code"), function(c_blk) {
   			var mkController = function(id) {
   				return $("<a>",
   					{ href : "#"
@@ -144,16 +144,26 @@ $(document).ready(function() {
   										 , type: 'POST'
   										 , contentType: 'text/json'
   										 , data : JSON.stringify({ "id": id
+  																						 , "lang": $("#raw-"+id).data("lang")
   																						 , "source": $("#raw-"+id).text()})
   										 }).done(function(data) {
   												 var result_class = "alert-error";
-  												 if (data.code == 0) { result_class = "alert-success"; }
-  												 $("#"+res_id)
-  														.html("<i class=\"icon-chevron-right\"></i> ");
+  												 if (data.code == 0) {
+														 result_class = "alert-success";
+  											   	 $("#"+res_id).html("<i class=\"icon-ok\"></i> ");
+													 } else {
+  											   	 $("#"+res_id).html("<i class=\"icon-remove\"></i> ");
+													 }
   												 $("#"+res_id).attr("class",result_class);
   												 $("<b>", { text : data.result }).appendTo($("#"+res_id))
   												 window.parent.postMessage("preview-resize","*");
-  										 })
+  										 }).fail(function(data) {
+  												 $("#"+res_id).attr("class","alert-error");
+  												 $("#"+res_id).html("<i class=\"icon-warning-sign\"></i> ");
+  												 $("<b>", { text : "Sorry, this seems like a server error." }).appendTo($("#"+res_id))
+											 });
+												
+								
   							return false;
   						}
   				  , html : "<i class=\"icon-cog\"></i>Execute"}).attr("class",

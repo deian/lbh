@@ -27,7 +27,7 @@ import qualified Hails.Web.Frank as Frank
 import           LBH.MP
 import           LBH.Views
 
-import           LBH.ActiveHaskell
+import           LBH.ActiveCode
 import           Data.Aeson (decode, encode)
 
 import Debug.Trace
