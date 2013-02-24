@@ -94,6 +94,10 @@ postsController = do
         liftLIO $ savePost lpost
         post <- unlabel lpost
         return $ redirectTo $ "/posts/" ++ show (getPostId post)
+  REST.delete $ withAuthUser $ \usr -> do
+    lreq <- request
+    liftLIO $ deletePost lreq
+    return $ okHtml ""
 
 --
 -- Users
@@ -156,7 +160,9 @@ tagsController = do
   REST.index $ do
     mu <- currentUser
     ts <- liftLIO . withLBHPolicy $ do
-      findAll $ (select [] "tags") { sort = [Asc "count"] }
+      let qry :: BsonDocument
+          qry = ["$gt" -: (0::Int)]
+      findAll $ (select ["count" -: qry] "tags") { sort = [Desc "count"] }
     matype <- requestHeader "accept"
     case matype of
       Just atype |  "application/json" `S8.isInfixOf` atype ->

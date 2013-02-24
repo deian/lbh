@@ -8,7 +8,7 @@ module LBH.MP ( withLBHPolicy
               , PostId
               , getPostId
               , Post(..), labeledRequestToPost, partiallyFillPost 
-              , savePost
+              , savePost, deletePost
                 -- * Users
               , User(..), currentUser, withAuthUser
                 -- * Tags
@@ -102,6 +102,7 @@ instance PolicyModule LBHPolicy where
          document $ const $ do
            readers ==> anybody
            writers ==> anybody
+         field "count"  $ searchable
        --
      return $ LBHPolicyTCB priv
        where this = privDesc priv
@@ -238,7 +239,6 @@ savePost lpost =  withPolicyModule $ \(LBHPolicyTCB privs) -> do
   let p = if l `canFlowTo` labelOf lpostE
             then privs else noPriv
   saveLabeledRecordP p lpost'
-
   -- update tags
   postE <- unlabel lpostE >>= fromDocument
   let tags = List.nub $ postTags post ++ postTags postE
@@ -255,6 +255,27 @@ savePost lpost =  withPolicyModule $ \(LBHPolicyTCB privs) -> do
       Just t' -> saveRecordP p $ t' { tagCount = tagCount t' + c }
   --
     where l = dcLabel dcTrue (dcIntegrity . labelOf $ lpost)
+
+-- | Delete post if endorsed by owner
+deletePost :: DCLabeled Request -> DC ()
+deletePost lreq = withPolicyModule $ \(LBHPolicyTCB privs) -> do
+  doc <- labeledRequestToHson lreq >>= unlabel
+  case (lookupObjId "_id" doc, lookup "_method" doc) of
+    (Just _id, Just ("DELETE" :: Text)) -> do
+     (Just lpost) <- findOne $ select ["_id" -: _id] "posts"
+     -- Use privs if request is from the correct user (i.e.,
+     -- has at least same integrity)
+     let p = if l `canFlowTo` labelOf lpost
+               then privs else noPriv
+     deleteP p (select ["_id" -: _id] "posts")
+     -- update tags
+     post <- unlabelP p lpost >>= fromDocument
+     forM_ (postTags post) $ \t -> do
+       (Just t') <- findBy "tags" "_id" t
+       saveRecordP p $ t' { tagCount = tagCount t' - 1 }
+     --
+    _ -> fail "deletePost: Missing _id"
+    where l = dcLabel dcTrue (dcIntegrity . labelOf $ lreq)
 
 --
 -- Users

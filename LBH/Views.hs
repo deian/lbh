@@ -156,21 +156,40 @@ editPost post = do
           ! dataAttribute "toggle" "button" $ do
             i ! class_ "icon-eye-open" $ ""
             " Preview"
-      div ! class_ "pull-right" $ do
-        a ! class_ "btn"
-          ! (if postIsPublic post
-               then A.style "display: none"
-               else mempty)
-          ! id "post-make-public-btn" $ do
-            i ! class_ "icon-globe" $ ""
-            " Make public"
-        a ! class_ "btn"
-          ! (if not $ postIsPublic post
-               then A.style "display: none"
-               else mempty)
-          ! id "post-make-private-btn" $ do
-            i ! class_ "icon-lock" $ ""
-            " Make private"
+      div ! class_ "btn-group pull-right dropup" $ do
+        button ! class_ "btn" 
+               ! dataAttribute "toggle" "dropdown" $ do
+                    i ! class_ "icon-wrench" $ ""
+        ul ! class_ "dropdown-menu" $ do
+          li $ a ! (if postIsPublic post
+                      then A.style "display: none"
+                      else mempty)
+                 ! id "post-make-public-btn" $ do
+                   i ! class_ "icon-globe" $ ""
+                   " Make public"
+          li $ a ! (if not $ postIsPublic post
+                      then A.style "display: none"
+                      else mempty)
+                 ! id "post-make-private-btn" $ do
+                   i ! class_ "icon-lock" $ ""
+                   " Make private"
+          li $ a ! href "#confirmDelete"
+                 ! dataAttribute "toggle" "modal" $ do
+                 i ! class_ "icon-trash" $ ""
+                 " Delete"
+  div ! id "confirmDelete" ! class_ "modal hide fade" ! tabindex "-1" $ do
+    div ! class_ "modal-header" $ do
+      button ! type_ "button" ! class_ "close"
+             ! dataAttribute "dismiss" "modal" $ "x"
+      h3 $ "Are you sure you want to delete post?"
+    div ! class_ "modal-body" $ do
+     p $ "Once you delete this post, you will not be able to\
+         \ recover its contents."
+     div ! class_ "btn-group pull-right" $ do
+       button ! type_ "button" ! class_ "btn"
+              ! dataAttribute "dismiss" "modal" $ "Cancel"
+       button ! type_ "button" ! class_ "btn btn-danger"
+              ! id "post-delete-btn" $ "Delete"
   div ! id "post-preview" ! A.style "display: none" $ do
     ul ! class_ "breadcrumb" $ do
        li $ "Preview..."

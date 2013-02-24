@@ -110,6 +110,17 @@ $(document).ready(function() {
   						    if(do_preview) { refresh_preview(); }
   						});
   	});
+
+    $("#post-delete-btn").click( function () {
+  			$.ajax({ url  : '/posts'
+  		         , type : 'DELETE'
+  		         , data : "_id="+$("#editPost").find("input[name=_id]").val()
+									      +"&_method=DELETE"
+							 }
+  						).always(function() {
+									window.location="/posts";
+  						});
+  	});
   
 
     $("#post-make-public-btn").click( function () {
