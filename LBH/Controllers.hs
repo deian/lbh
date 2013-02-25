@@ -28,7 +28,7 @@ import           LBH.MP
 import           LBH.Views
 
 import           LBH.ActiveCode
-import           Data.Aeson (decode, encode)
+import           Data.Aeson (decode, encode, toJSON)
 
 import Debug.Trace
 
@@ -39,7 +39,8 @@ server = mkRouter $ do
   routeName "users" usersController
   routeName "tags"   tagsController
   Frank.post "/exec" execController
-  Frank.get "/login" $ withAuthUser $ \_ -> redirectBack
+  Frank.get "/login" loginController
+  Frank.get "/register" registerController
 
 --
 -- Posts
@@ -107,8 +108,12 @@ usersController :: RESTController
 usersController = do
   REST.index $ do
     mu <- currentUser
-    ps <- liftLIO . withLBHPolicy $ findAll $ select [] "users"
-    return $ respondHtml mu $ indexUsers mu ps
+    us <- liftLIO . withLBHPolicy $ findAll $ select [] "users"
+    matype <- requestHeader "accept"
+    case matype of
+      Just atype |  "application/json" `S8.isInfixOf` atype ->
+           return $ ok "application/json" (encode $ toJSON $ map userId us)
+      _ -> return $ respondHtml mu $ indexUsers mu us
   REST.new $ withAuthUser $ \u ->
     return $ redirectTo $ "/users/" ++ T.unpack (userId u) ++ "/edit"
   REST.show $ do
@@ -181,3 +186,12 @@ tagsController = do
                                 , userFullName = T.empty
                                 , userEmail = T.empty }) u, p)
     return $ respondHtml mu $ indexPosts (S8.unpack tag ++ " posts") mu ups
+
+loginController :: Controller Response
+loginController = do
+    mu <- currentUser
+    return $ respondHtml mu loginPage
+
+registerController :: Controller Response
+registerController = withAuthUser $ \u ->
+  return $ redirectTo $ concat ["/users/", T.unpack $ userId u, "/edit"] -- 

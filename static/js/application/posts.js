@@ -116,8 +116,7 @@ $(document).ready(function() {
   		         , type : 'DELETE'
   		         , data : "_id="+$("#editPost").find("input[name=_id]").val()
 									      +"&_method=DELETE"
-							 }
-  						).always(function() {
+							 }).always(function() {
 									window.location="/posts";
   						});
   	});
@@ -146,6 +145,68 @@ $(document).ready(function() {
 									refresh_preview();
   						});
   	});
+
+		var cur_users = [];
+
+		var removeFirst = function(val, arr) {
+				var idx = $.inArray(val, arr);
+        if(idx >= 0 ) { arr.splice(idx, 1);}
+				return arr;
+		};
+
+    $('#post-add-collaborator').typeahead( {
+				 source : function(query, process) {
+  		     $.ajax({ url  : '/users'
+  		            , type : 'GET'
+									, headers : { accept : 'application/json' }
+  		     			  }).done(function(users) {
+											// remve owner and existing collaborators
+											var owner = $("input[name=owner]").val();
+											cur_users = users;
+											removeFirst(owner , cur_users);
+											$("input[name='collaborators[]']").map(function() {
+													removeFirst($(this).val(), cur_users);
+											});
+											process(cur_users);
+  		     			 });
+				 }
+		});
+
+    $('#post-add-collaborator').change( function() {
+				var new_c = $("#post-add-collaborator").val();
+				if($.inArray(new_c, cur_users) >= 0) {
+						$("#post-add-collaborator-btn").removeAttr("disabled");
+				} else {
+						$("#post-add-collaborator-btn").attr("disabled","");
+				}
+		});
+
+		$("#post-add-collaborator-btn").click( function () {
+				var new_c = $("#post-add-collaborator").val();
+				if(new_c.length>0 && $.inArray(new_c, cur_users) >= 0) {
+				  set_tags("#editPost");
+					$("<input>", { type : 'hidden'
+											 , name : 'collaborators[]'
+											 , value : new_c }).appendTo($("#editPost"));
+          $("#post-save-btn").click();
+					$("<li>", { id : "collaborator-"+new_c
+							      , html : '<a href="#">'+new_c+
+											       '<span class="pull-right collaborator-remove"\
+                                           data-collaborator="'+new_c+'">\
+                                <i class="icon-trash"></i></span></a>'
+					          }).appendTo($("#currentCollabs"));
+					removeFirst(new_c, cur_users);
+				}
+		});
+
+		$(".collaborator-remove").map(function() {
+				$(this).click(function() {
+						var c = $(this).data("collaborator");
+						$("input[name='collaborators[]'][value="+c+"]").remove();
+            $("#post-save-btn").click();
+						$("#collaborator-"+c).remove();
+				});
+		});
 
   })();
 

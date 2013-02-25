@@ -70,13 +70,15 @@ instance PolicyModule LBHPolicy where
            integrity ==> anybody
          document $ \doc -> do
            let (Just p) = fromDocument doc
-               owner = userToPrincipal . postOwner $ p
+               collabs = map userToPrincipal $ postOwner p : postCollaborators p
+               ws      =  List.foldl' (\/) this collabs
            readers ==> if postIsPublic p
                          then anybody
-                         else this \/ owner
-           writers ==> this \/ owner
+                         else ws
+           writers ==> ws
          field "owner" $ searchable
          field "tags"  $ searchable
+         field "collaborators" $ searchable
        -- = Users ===================================================
        collection "users" $ do
          access $ do
@@ -125,14 +127,15 @@ getPostId = fromJust . postId
 type Tag = Text
 
 -- | Data type encoding posts.
-data Post = Post { postId          :: PostId
-                 , postTitle       :: Text
-                 , postOwner       :: UserName
-                 , postDescription :: Text
-                 , postBody        :: Text
-                 , postIsPublic    :: Bool
-                 , postDate        :: UTCTime
-                 , postTags        :: [Tag]
+data Post = Post { postId            :: PostId
+                 , postTitle         :: Text
+                 , postOwner         :: UserName
+                 , postDescription   :: Text
+                 , postBody          :: Text
+                 , postIsPublic      :: Bool
+                 , postDate          :: UTCTime
+                 , postTags          :: [Tag]
+                 , postCollaborators :: [UserName]
                  } deriving (Show, Eq)
 
 
@@ -141,30 +144,34 @@ instance DCRecord Post where
     let pid      = lookupObjId "_id" doc
         isPublic = fromMaybe False $ lookupBool "isPublic" doc
         tags     = fromMaybe [] $ (lookupTyped "tags"  doc :: Maybe [Tag])
+        collabs  = fromMaybe [] $ (lookupTyped "collaborators"  doc
+                                    :: Maybe [UserName])
     title        <- lookup "title" doc
     owner        <- lookup "owner" doc
     description  <- lookup "description" doc
     body         <- lookup "body"  doc
     date         <- lookup "date"  doc
-    return Post { postId          = pid
-                , postTitle       = title
-                , postOwner       = owner
-                , postDescription = description
-                , postBody        = body
-                , postDate        = date
-                , postIsPublic    = isPublic
-                , postTags        = tags }
+    return Post { postId            = pid
+                , postTitle         = title
+                , postOwner         = owner
+                , postDescription   = description
+                , postBody          = body
+                , postDate          = date
+                , postIsPublic      = isPublic
+                , postTags          = tags 
+                , postCollaborators = collabs }
                 
   toDocument p = 
     let pid = postId p
         pre = maybe [] (\i -> ["_id" -: i]) $ postId p
-    in pre ++ [ "title"       -: postTitle p
-              , "owner"       -: postOwner p
-              , "description" -: postDescription p
-              , "body"        -: postBody p
-              , "date"        -: postDate p
-              , "isPublic"    -: postIsPublic p
-              , "tags"        -: postTags p ]
+    in pre ++ [ "title"         -: postTitle p
+              , "owner"         -: postOwner p
+              , "description"   -: postDescription p
+              , "body"          -: postBody p
+              , "date"          -: postDate p
+              , "isPublic"      -: postIsPublic p
+              , "tags"          -: postTags p
+              , "collaborators" -: postCollaborators p ]
 
   recordCollection _ = "posts"
 
@@ -222,11 +229,13 @@ partiallyFillPost ldoc = withPolicyModule $ \(LBHPolicyTCB p) -> do
             doc' <- unlabel ldoc'
             -- merge new (safe) fields and convert it to a record
             fromDocument $ (safeFields `include` doc) `merge`
-                           ["tags" -: ([]::[Tag])] `merge` -- delete (hack)
-                           doc'
+                           ["tags" -: ([]::[Tag])
+                           ,"collaborators" -: ([]::[UserName])
+                           ] `merge` doc'
           return (Just res)
         _ -> return Nothing
-  where safeFields = ["isPublic", "title", "description", "body", "tags"]
+  where safeFields = [ "isPublic", "title", "description"
+                     , "body", "tags", "collaborators"]
 
 -- | Save post, by first declassifying it
 savePost :: DCLabeled Post -> DC ()

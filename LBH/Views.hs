@@ -37,27 +37,48 @@ respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
     title "Learn By Hacking"
     stylesheet "/static/css/bootstrap.css"
     stylesheet "/static/css/application.css"
+    script ! src "https://login.persona.org/include.js" $ ""
     script ! src "/static/js/jquery.min.js" $ ""
+    script ! src "/static/js/jquery.cookie.js" $ ""
     script ! src "/static/js/bootstrap.min.js" $ ""
+    script ! src "/static/js/application.js" $ ""
   body $ do
      div ! class_ "navbar navbar-fixed-top navbar-inverse"
          ! id "page-nav" $ do
        div ! class_ "navbar-inner" $ do
          div ! class_ "container" $ do
            a ! href "/" ! class_ "brand" $ "Learn By Hacking" 
-           ul ! class_ "nav pull-right" $ case muser of 
-            Nothing -> do
-              li $ a ! href "/login" $ do
+           ul ! class_ "nav pull-right" $
+             maybe publicMenu userMenu muser
+     div ! class_ "container" $ content
+      where publicMenu = do
+              li $ a ! href "#" ! id "login" $ do
                span ! class_ "icon-user icon-white" $ ""
                " Login"
-            Just u -> li ! class_ "pull-right" $
-              a ! href (toValue $ "/users/" `T.append` userId u) $ do
-                img ! src (toValue $ T.concat [
-                  "https://secure.gravatar.com/avatar/"
-                  , md5 (userEmail u), "?s=16"])
-                " "
-                toHtml (userId u)
-     div ! class_ "container" $ content
+            userMenu u = do
+              li ! class_ "dropdown" $ do
+                a ! href "#" ! class_ "dropdown-toggle" 
+                  ! dataAttribute "toggle" "dropdown" $ do
+                    img ! src (toValue $ T.concat [
+                      "https://secure.gravatar.com/avatar/"
+                      , md5 (userEmail u), "?s=16"])
+                    " "
+                    toHtml $ userId u
+                    b ! class_ "caret" $ ""
+                ul ! class_ "dropdown-menu" $ do
+                  let uUrl = "/users/" `T.append` userId u
+                  li $ a ! href (toValue uUrl) $ do
+                    span ! class_ "icon-user" $ ""
+                    " View Profile"
+                  li $ a ! href (toValue $ uUrl `T.append` "/edit") $ do
+                    span ! class_ "icon-edit" $ ""
+                    " Edit Profile"
+                  li $ a ! href "/posts/new" $ do
+                    span ! class_ "icon-folder-open" $ ""
+                    " New Post"
+                  li $ a ! href "#" ! id "logout" $ do
+                    span ! class_ "icon-road" $ ""
+                    " Logout"
 
 stylesheet :: String -> Html
 stylesheet uri = link ! rel "stylesheet" 
@@ -122,6 +143,11 @@ editPost post = do
         input ! type_ "hidden" ! name "_method" ! value "PUT"
         input ! type_ "hidden" ! name "_id"
               ! value (toValue $ show $ getPostId post)
+        input ! type_ "hidden" ! name "owner"
+              ! value (toValue $ postOwner post)
+        forM_ (postCollaborators post) $ \c ->
+          input ! type_ "hidden" ! name "collaborators[]"
+                ! value (toValue c)
       div $ do
         label ! for "title" $ "Title:"
         input ! class_ "span12" ! type_ "text"
@@ -173,10 +199,26 @@ editPost post = do
                  ! id "post-make-private-btn" $ do
                    i ! class_ "icon-lock" $ ""
                    " Make private"
+          li $ a ! href "#manageCollabs"
+                 ! dataAttribute "toggle" "modal" $ do
+                 i ! class_ "icon-user" $ ""
+                 " Manage collaborators"
+          li ! class_ "divider" $ ""
           li $ a ! href "#confirmDelete"
                  ! dataAttribute "toggle" "modal" $ do
                  i ! class_ "icon-trash" $ ""
                  " Delete"
+  div ! id "post-preview" ! A.style "display: none" $ do
+    ul ! class_ "breadcrumb" $ do
+       li $ "Preview..."
+       li ! class_ "pull-right" $ do
+         a ! href "#"
+           ! id "refresh-post-preview-btn"
+           ! A.title "Refresh" $ i ! class_ "icon-refresh" $ ""
+    iframe ! id "post-preview-body"
+           ! src (toValue $ "/posts/" ++ (show $ getPostId post))
+           $ ""
+  -- Delete confirmation modal
   div ! id "confirmDelete" ! class_ "modal hide fade" ! tabindex "-1" $ do
     div ! class_ "modal-header" $ do
       button ! type_ "button" ! class_ "close"
@@ -190,16 +232,38 @@ editPost post = do
               ! dataAttribute "dismiss" "modal" $ "Cancel"
        button ! type_ "button" ! class_ "btn btn-danger"
               ! id "post-delete-btn" $ "Delete"
-  div ! id "post-preview" ! A.style "display: none" $ do
-    ul ! class_ "breadcrumb" $ do
-       li $ "Preview..."
-       li ! class_ "pull-right" $ do
-         a ! href "#"
-           ! id "refresh-post-preview-btn"
-           ! A.title "Refresh" $ i ! class_ "icon-refresh" $ ""
-    iframe ! id "post-preview-body"
-           ! src (toValue $ "/posts/" ++ (show $ getPostId post))
-           $ ""
+  -- Collaborators modal
+  div ! id "manageCollabs" ! class_ "modal hide fade" ! tabindex "-1" $ do
+    div ! class_ "modal-header" $ do
+      button ! type_ "button" ! class_ "close"
+             ! dataAttribute "dismiss" "modal" $ "x"
+      h3 $ "Manage collaborators"
+    div ! class_ "modal-body" $ do
+      ul ! class_ "nav nav-list" ! id "currentCollabs" $ do
+        li ! class_ "nav-header" $ "Owner"
+        li $ a ! href "#" $ toHtml $ postOwner post
+        li ! class_ "divider" $ ""
+        li ! class_ "nav-header" $ "Collaborators"
+        forM_ (postCollaborators post) $ \c ->
+          li ! id (toValue $ "collaborator-" `T.append` c) $ a ! href "#" $ do
+                 toHtml c
+                 span ! class_ "pull-right collaborator-remove"
+                      ! dataAttribute "collaborator" (toValue c) $
+                   i ! class_ "icon-trash" $ ""
+               
+    div ! class_ "modal-footer" $ 
+      div ! class_ "input-append inline" $ do
+        input ! type_ "text"
+              ! id "post-add-collaborator"
+              ! class_ "span3"
+              ! placeholder "New collaborator"
+              ! dataAttribute "provide" "typeahead"
+        button ! type_ "button"
+               ! id "post-add-collaborator-btn"
+               ! class_ "btn btn-primary "
+               ! disabled "" $ do
+          i ! class_ "icon-plus icon-white" $ ""
+          " Add"
 
 showPost :: Maybe User -> Post -> Html
 showPost muser post = do
@@ -217,7 +281,9 @@ showPost muser post = do
         i ! class_ "icon-user" $ ""
         " "
         toHtml $ postOwner post
-      when (userId `liftM` muser == Just (postOwner post)) $ do
+      when (isJust muser &&
+            (userId . fromJust $ muser)
+                 `elem` (postOwner post : postCollaborators post)) $ do
         li $ "|"
         li $ a ! href (toValue $ "/posts/" ++ (show $ getPostId post)
                               ++ "/edit") $ do
@@ -304,16 +370,13 @@ indexUsers musr ps = do
                                       , md5 (userEmail user), "?s=48"])
         div ! class_ "media-body" $ do
             h4 ! class_ "media-heading" $ do
-              a ! href (toValue userUrl) $ toHtml $
-               T.concat $ (userId user) :
-                 if T.null (userFullName user)
-                   then []
-                   else [" [ ", userFullName user, " ] "]
+              a ! href (toValue userUrl) $ toHtml $ userId user
             when (musr == Just user) $ do
               a ! class_ "pull-right"
                 ! href (toValue $ userUrl `T.append` "/edit") $ do
                  i ! class_ "icon-wrench" $ ""
                  " edit "
+            div $ toHtml $ userFullName user
 
 showUser :: User -> [Post] -> Bool -> Html
 showUser user ps isCurrentUser = do
@@ -393,6 +456,15 @@ indexTags ts = do
 
 tagsToJSON :: [TagEntry] -> Aeson.Value
 tagsToJSON ts = toJSON $ Aeson.object [ "tags" .= ts]
+
+--
+-- Login
+--
+
+loginPage :: Html
+loginPage = do
+  script $ "$(document).ready(function() { $(\"#login\").click(); });"
+  "Please login first..."
 
 --
 -- Helper functions
