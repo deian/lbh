@@ -3,7 +3,7 @@ $(document).ready(function() {
 	//
 	// All
 	//
-	$("a[data-toggle=tooltip]").tooltip()
+	$("a[data-toggle=tooltip]").tooltip();
 
 	//
   // New and Edit

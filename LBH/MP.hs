@@ -3,14 +3,15 @@
            , DeriveDataTypeable
            , MultiParamTypeClasses #-}
 -- | Defines the data model and security policy of posts.
-module LBH.MP ( withLBHPolicy
+module LBH.MP ( personaLoginEmailToUid
+              , withLBHPolicy
                 -- * Posts
               , PostId
               , getPostId
               , Post(..), labeledRequestToPost, partiallyFillPost 
               , savePost, deletePost
                 -- * Users
-              , User(..), currentUser, withAuthUser
+              , User(..), createUser, updateUser
                 -- * Tags
               , Tag, TagEntry(..)
               ) where
@@ -20,16 +21,19 @@ import           Prelude hiding (lookup)
 import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Char8 as S8
 import           Data.Typeable
 import           Data.Time.Clock (UTCTime)
 import qualified Data.List as List
+import qualified Data.Set as Set
 import           Data.Aeson (ToJSON(..), (.=), object)
+import           Text.Regex.Posix
 
 import           Control.Monad
 
 import           Hails.Data.Hson
-import           Hails.Web
+import           Hails.Web hiding (body)
 import           Hails.Database
 import           Hails.Database.Structured
 import           Hails.PolicyModule
@@ -38,7 +42,10 @@ import           Hails.HttpServer.Types
 
 import           LIO
 import           LIO.DCLabel
+import           LIO.DCLabel.Core
+import           LIO.DCLabel.Privs.TCB (allPrivTCB)
 
+import Debug.Trace
 --
 -- Policy
 --
@@ -83,16 +90,17 @@ instance PolicyModule LBHPolicy where
        collection "users" $ do
          access $ do
            readers ==> anybody
-           writers ==> anybody
+           writers ==> (this \/ principal "#users")
          clearance $ do
            secrecy   ==> this
            integrity ==> anybody
          document $ \doc -> do
            let (Just u) = fromDocument doc
-               user = userToPrincipal . userId $ u
+               user = userToPrincipal . userEmail $ u
            readers ==> anybody
            writers ==> this \/ user
          field "fullName" $ searchable
+         field "email"    $ searchable
        -- = Tags ====================================================
        collection "tags" $ do
          access $ do
@@ -162,8 +170,7 @@ instance DCRecord Post where
                 , postCollaborators = collabs }
                 
   toDocument p = 
-    let pid = postId p
-        pre = maybe [] (\i -> ["_id" -: i]) $ postId p
+    let pre = maybe [] (\i -> ["_id" -: i]) $ postId p
     in pre ++ [ "title"         -: postTitle p
               , "owner"         -: postOwner p
               , "description"   -: postDescription p
@@ -293,14 +300,14 @@ deletePost lreq = withPolicyModule $ \(LBHPolicyTCB privs) -> do
 -- | Data type describing users
 data User = User { userId       :: UserName  -- ^ UserName
                  , userFullName :: Text      -- ^ User's full name
-                 , userEmail    :: Text      -- ^ User's email MD5(e-mail)
+                 , userEmail    :: UserName  -- ^ User's email
                  } deriving (Show, Eq)
 
 instance DCRecord User where
   fromDocument doc = do
     uid      <- lookup "_id" doc
     fullName <- lookup "fullName" doc
-    email <- lookup "email" doc
+    email    <- lookup "email" doc
     return User { userId       = uid
                 , userFullName = fullName
                 , userEmail    = email }
@@ -313,6 +320,59 @@ instance DCRecord User where
 
 instance DCLabeledRecord LBHPolicy User where
   endorseInstance _ = LBHPolicyTCB noPriv
+
+
+-- | Inser new user. Nothing = success, String = error
+createUser :: DCLabeled User -> DC (Maybe String)
+createUser luser = withPolicyModule $ \(LBHPolicyTCB _privs) -> do
+  let (Just privs) = dcDelegatePriv _privs (privDesc _privs \/ principal "#users")
+  user  <- unlabel luser
+  let wellFormed = let uid = T.unpack $ userId user
+                   in length uid <= 16 &&
+                      uid =~ ("^[a-zA-Z][a-zA-Z0-9_]+$" :: String)
+  if not wellFormed
+    then return . Just $ "Malformed username"
+    else do ps0 <- findAll (select ["_id"   -: userId user] "users")
+            ps1 <- findAll (select ["email" -: userEmail user] "users")
+            if null (ps0 ++ ps1 :: [User])
+              then do void $ insertLabeledRecordP privs luser
+                      return Nothing
+              else return . Just $ "Username exists"
+
+-- | Update user. Use least privilege and user partiallyFillUser to
+-- assert that only the name can be modified.
+updateUser :: DCLabeled Document -> DC (Maybe (DCLabeled User))
+updateUser ldoc = withPolicyModule $ \(LBHPolicyTCB _privs) -> do
+  mluser <- partiallyFillUser _privs ldoc
+  case mluser of
+    Nothing -> return Nothing
+    Just luser -> do
+      let (Just privs) = dcDelegatePriv _privs
+                                        (privDesc _privs \/ principal "#users")
+      saveLabeledRecordP privs luser
+      return (Just luser)
+
+-- | Create new record with partially filled fields
+partiallyFillUser :: DCPriv
+                  -> DCLabeled Document -> DBAction (Maybe (DCLabeled User))
+partiallyFillUser p ldoc = do
+  -- Unlabel document
+  doc <- unlabel ldoc
+  case lookup "_id" doc of
+    Nothing -> return Nothing
+    Just (_id :: UserName) -> do
+      -- Lookup existing document:
+      mldoc' <- findOne (select ["_id" -: _id] "users")
+      clr <- getClearance
+      case mldoc' of
+        Just ldoc' | canFlowTo (labelOf ldoc') clr -> do
+          res <- liftLIO $ toLabeledTCB p (labelOf ldoc') $ do
+            doc' <- unlabel ldoc'
+            -- merge new (safe) fields and convert it to a record
+            fromDocument $ (safeFields `include` doc) `merge` doc'
+          return (Just res)
+        _ -> return Nothing
+  where safeFields = [ "fullName"]
 
 --
 -- Tags
@@ -364,24 +424,46 @@ lookupTyped n d = case lookup n d of
           _ -> fail $ "lookupTyped: cannot extract id from " ++ show n
   where maybeRead = fmap fst . listToMaybe . reads
 
--- Create LBH user from X-Hails header
-currentUser :: Controller (Maybe User)
-currentUser = do
-  mu <- getHailsUser
-  case mu of
-    Nothing -> return Nothing
-    Just u -> liftLIO $ withPolicyModule $ \(LBHPolicyTCB priv) -> do
-      mres <- findByP priv "users" "_id" u
-      case mres of
-        Just usr -> return (Just usr)
-        Nothing -> do insertRecordP priv $ newUser u
-                      return . Just $ newUser u
-    where newUser u = User { userId = u
-                           , userFullName = T.empty
-                           , userEmail = T.empty }
-
--- | Execute action with authenticated user (or force auth)
-withAuthUser :: (User -> Controller Response) -> Controller Response
-withAuthUser act = withUserOrDoAuth $ const $ do
-  mu <- currentUser
-  maybe (return serverError) act mu
+-- | Requests are labeled by email addreses, relabel to id's.
+personaLoginEmailToUid :: Middleware
+personaLoginEmailToUid app conf lreq = do
+  meu <- liftLIO . withPolicyModule $ \(LBHPolicyTCB privs) -> do
+    let i     = dcIntegrity $ requestLabel conf
+        s     = dcSecrecy   $ requestLabel conf
+        ps    = toList i
+        email = head . head $ ps
+    -- Label must have format <_, principal>
+    musr <- if i == dcFalse || length ps /= 1 || length (head ps) /= 1
+              then return Nothing
+              else do mu <- findByP privs "users" "email" $
+                              T.decodeUtf8 . principalName $ email
+                      return $ (principal . T.encodeUtf8 . userId) `liftM` mu
+    return $ do { u <- musr ; return $ mkXfms email u }
+  case meu of
+    Nothing -> app conf lreq
+    Just (e2u, u2e) -> do
+         let conf' = conf { browserLabel = dcLabel
+                              (e2u $ dcSecrecy $ browserLabel conf) dcTrue
+                          , requestLabel = dcLabel
+                               dcTrue (e2u $ dcIntegrity $ requestLabel conf)
+                          }
+         setClearanceP allPrivTCB $ browserLabel conf'
+         lreq' <- relabelLabeledP allPrivTCB (requestLabel conf') lreq
+         resp <- app conf' lreq'
+         curl <- getLabel
+         curc <- getClearance
+         let curc' = dcLabel (u2e $ dcSecrecy curc) (u2e $ dcIntegrity curc)
+             curl' = dcLabel (u2e $ dcSecrecy curl) (u2e $ dcIntegrity curl)
+         -- raise current clearance, considering the current label
+         setClearanceP allPrivTCB $ curc' `upperBound` curl
+         -- change current label
+         setLabelP allPrivTCB curl'
+         -- lower current clearance
+         setClearanceP allPrivTCB $ curc'
+         return resp
+    where mkXfms e u = ( \cmp -> xfm (\x -> if x == e then u else x) cmp
+                       , \cmp -> xfm (\x -> if x == u then e else x) cmp )
+          xfm f cmp | cmp == dcTrue || cmp == dcFalse = cmp
+          xfm f cmp = let cs = unDCFormula cmp
+                      in dcFormula $
+                           Set.map (\c -> Clause $ Set.map f $ unClause c) cs

@@ -24,6 +24,8 @@ import           Hails.Web.REST (RESTController)
 import qualified Hails.Web.REST as REST
 import qualified Hails.Web.Frank as Frank
 
+import           Network.HTTP.Types
+
 import           LBH.MP
 import           LBH.Views
 
@@ -33,14 +35,17 @@ import           Data.Aeson (decode, encode, toJSON)
 import Debug.Trace
 
 server :: Application
-server = mkRouter $ do
-  routeTop $ redirectTo "/posts/"
-  routeName "posts" postsController
-  routeName "users" usersController
-  routeName "tags"   tagsController
-  Frank.post "/exec" execController
-  Frank.get "/login" loginController
-  Frank.get "/register" registerController
+server =  do
+   mkRouter $ do
+     Frank.post "/users" usersCreate
+   personaLoginEmailToUid . mkRouter $ do
+     routeTop $ redirectTo "/posts/"
+     routeName "users" usersController
+     routeName "posts" postsController
+     routeName "tags"   tagsController
+     Frank.post "/exec" execController
+     Frank.get "/login" loginController
+  
 
 --
 -- Posts
@@ -48,7 +53,7 @@ server = mkRouter $ do
 
 postsController :: RESTController
 postsController = do
-  REST.index $ do
+  REST.index $ maybeRegister $  do
     mu <- currentUser
     ps <- liftLIO . withLBHPolicy $ findAll $ select [] "posts"
     ups <- liftLIO $ forM ps $ \p-> do
@@ -73,7 +78,7 @@ postsController = do
           Just t' -> saveRecord $ t' { tagCount = tagCount t' + 1 }
       --
       return $ redirectTo $ "/posts/" ++ (show _id)
-  REST.show $ do
+  REST.show $ maybeRegister $ do
     mu <- currentUser
     (Just pid) <- queryParam "id"
     mpost <- liftLIO . withLBHPolicy $ do
@@ -104,9 +109,31 @@ postsController = do
 -- Users
 --
 
+
+usersCreate :: Controller Response
+usersCreate = withUserOrDoAuth $ \u -> do
+    let ctype = "text/json"
+        respJSON403 msg = Response status403 [(hContentType, ctype)] $
+                           L8.pack $ "{ \"error\" : " ++
+                                       show (msg :: String) ++ "}"
+    musr <- currentUser
+    case musr of
+      Just _ -> return $ respJSON403 "Already created user name"
+      _ -> do ldoc   <- request >>= labeledRequestToHson
+              luser  <- liftLIO . withLBHPolicy $ fromLabeledDocument ldoc
+              merror <- liftLIO $ createUser luser
+              case merror of
+                Just err -> return . respJSON403 $ err
+                _ -> return $ ok ctype "{ \"message\": \"ok\" }"
+
 usersController :: RESTController
 usersController = do
-  REST.index $ do
+  REST.new $ withUserOrDoAuth $ \u -> do
+    musr <- currentUser
+    case musr of
+      Just usr -> return $ redirectTo $ "/users/" ++ T.unpack (userId usr)
+      _ -> return $ respondHtml (Just $ fromMaybe (User u "" u) musr) $ newUser u
+  REST.index $ maybeRegister $ do
     mu <- currentUser
     us <- liftLIO . withLBHPolicy $ findAll $ select [] "users"
     matype <- requestHeader "accept"
@@ -114,9 +141,7 @@ usersController = do
       Just atype |  "application/json" `S8.isInfixOf` atype ->
            return $ ok "application/json" (encode $ toJSON $ map userId us)
       _ -> return $ respondHtml mu $ indexUsers mu us
-  REST.new $ withAuthUser $ \u ->
-    return $ redirectTo $ "/users/" ++ T.unpack (userId u) ++ "/edit"
-  REST.show $ do
+  REST.show $ maybeRegister $ do
     mu <- currentUser
     (Just uid) <- queryParam "id"
     (muser, ps) <- liftLIO . withLBHPolicy $ do
@@ -134,18 +159,18 @@ usersController = do
               return $ maybe notFound (respondHtml (Just usr) . editUser) muser
   REST.update $ withAuthUser $ \usr -> do
     ldoc <- request >>= labeledRequestToHson
-    liftLIO . withLBHPolicy $ do
-      luser <- fromLabeledDocument ldoc
-      void $ saveLabeledRecord luser
-      user <- unlabel luser
-      return $ redirectTo $ "/users/" ++ T.unpack (userId user)
+    mluser <- liftLIO $ updateUser ldoc
+    case mluser of
+     Just luser -> do user <- unlabel luser
+                      return $ redirectTo $ "/users/" ++ T.unpack (userId user)
+     _ -> return $ forbidden
 
 --
 -- Code execution
 --
 
 execController :: Controller Response
-execController = do
+execController = maybeRegister $ do
   ct <- requestHeader "content-type"
   if ct /= Just "application/json"
     then return badRequest
@@ -162,7 +187,7 @@ execController = do
 
 tagsController :: RESTController
 tagsController = do
-  REST.index $ do
+  REST.index $ maybeRegister $  do
     mu <- currentUser
     ts <- liftLIO . withLBHPolicy $ do
       let qry :: BsonDocument
@@ -173,7 +198,7 @@ tagsController = do
       Just atype |  "application/json" `S8.isInfixOf` atype ->
            return $ ok "application/json" (encode $ tagsToJSON ts)
       _ -> return $ respondHtml mu $ indexTags ts
-  REST.show $ do
+  REST.show $ maybeRegister $ do
     mu <- currentUser
     Just tag <- queryParam "id"
     ups <- liftLIO . withLBHPolicy $ do
@@ -189,9 +214,37 @@ tagsController = do
 
 loginController :: Controller Response
 loginController = do
-    mu <- currentUser
-    return $ respondHtml mu loginPage
+    mu  <- getHailsUser
+    usr <- currentUser
+    return $ respondHtml (maybe (def mu) Just usr) loginPage
+        where def mu =  do u <- mu
+                           return $ User u "" u
 
-registerController :: Controller Response
-registerController = withAuthUser $ \u ->
-  return $ redirectTo $ concat ["/users/", T.unpack $ userId u, "/edit"] -- 
+
+--
+-- Helpers
+--
+
+-- | Execute action with authenticated user (or force auth)
+withAuthUser :: (User -> Controller Response) -> Controller Response
+withAuthUser act = maybeRegister $ withUserOrDoAuth $ const $  do
+  musr <- currentUser
+  maybe (return serverError) act musr
+
+-- Create LBH user from X-Hails header
+currentUser :: Controller (Maybe User)
+currentUser = do
+  mu <- getHailsUser
+  case mu of
+    Nothing -> return Nothing
+    Just u -> liftLIO $ withLBHPolicy $ do
+      findBy "users" "email" u
+
+-- | Force user to register if they're logged in.
+maybeRegister :: Controller Response -> Controller Response
+maybeRegister ctrl = do
+  muName <- getHailsUser
+  musr   <- currentUser
+  if isJust muName && isNothing musr
+    then return $ redirectTo "/users/new"
+    else ctrl

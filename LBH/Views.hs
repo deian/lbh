@@ -407,30 +407,85 @@ showUser user ps isCurrentUser = do
                        then ("Public post", "icon-globe")
                        else ("Private post", "icon-lock")
 
-editUser :: User -> Html
-editUser usr = do
-  h1 $ toHtml (userId usr)
+newUser :: UserName -> Html
+newUser uemail = do
+  script ! src "/static/js/application/users.js" $ ""
+  h1 "Register"
   div $ do
-    form ! action "/users" ! method "POST" ! id "editUser" $ do
+    form ! action "/users" ! method "POST" ! id "newUser" $ do
       div $ do
-        input ! type_ "hidden" ! name "_method" ! value "PUT"
-        input ! type_ "hidden" ! name "_id"
-              ! value (toValue $ userId usr)
+        label ! for "emailD" $ "Email address:"
+        input ! class_ "span4" ! type_ "text"
+              ! name "emailD" ! id "emailD"
+              ! disabled "disabled"
+              ! value (toValue uemail)
+        input ! type_ "hidden"
+              ! name "email" ! id "email"
+              ! value (toValue uemail)
       div $ do
         label ! for "fullName" $ "Full name:"
         input ! class_ "span4" ! type_ "text"
               ! name "fullName" ! id "fullName"
-              ! value (toValue $ userFullName usr)
-      div $ do
-        label ! for "gravatar" $ "Email:"
-        input ! class_ "span4" ! type_ "email"
-              ! id "editUser-email"
-              ! name "email" ! id "email"
-              ! value (toValue $ userEmail usr)
+              ! placeholder "King Schultz"
+      div ! class_ "control-group" ! id "_id-group" $ do
+        label ! class_ "control-label" ! for "_id" $ do
+          "Username ("
+          a ! href "#"
+            ! dataAttribute "toggle" "tooltip"
+            ! A.title "Usernames can be at most 16 characters \
+                      \long. They must start with a letter and \
+                      \only contain letters, numbers, and \'_\',\
+                      \i.e., it must match ^[a-zA-Z][a-zA-Z0-9_]+$"
+            $ "?"
+          "):"
+        input ! class_ "span4" ! type_ "text"
+              ! name "_id" ! id "_id"
+              ! placeholder "dr_schultz"
+        span ! id "_id-group-help"
+             ! class_ "help-inline" $ ""
       div ! class_ "btn-group" $ do
-        input ! type_ "submit" ! class_ "btn btn-primary" ! value "Done"
-        input ! type_ "reset" ! class_ "btn" ! value "Reset"
+        input ! type_ "button" ! id "newUser-submit-btn"
+              ! class_ "btn btn-primary" ! value "Sign Up"
+        input ! type_ "reset"
+              ! id "newUser-reset-btn"
+              ! class_ "btn" ! value "Reset"
 
+editUser :: User -> Html
+editUser user = do
+  script ! src "/static/js/application/users.js" $ ""
+  h1 $ toHtml (userId user)
+  div $ do
+    form ! action "/users" ! method "POST" ! id "editUser" $ do
+      input ! type_ "hidden" ! name "_method" ! value "PUT"
+      div $ do
+        label ! for "emailD" $ "Email address:"
+        input ! class_ "span4" ! type_ "text"
+              ! name "emailD"
+              ! disabled "disabled"
+              ! value (toValue $ userEmail user)
+        input ! type_ "hidden"
+              ! name "email" ! id "email"
+              ! value (toValue $ userEmail user)
+      div $ do
+        label ! for "fullName" $ "Full name:"
+        input ! class_ "span4" ! type_ "text"
+              ! name "fullName" ! id "fullName"
+              ! value (toValue $ userFullName user)
+      div ! class_ "control-group" ! id "_id-group" $ do
+        label ! class_ "control-label" ! for "_id" $ do
+          "Username:"
+        input ! class_ "span4" ! type_ "text"
+              ! name "_idD"
+              ! value (toValue $ userId user)
+              ! disabled "disabled"
+        input ! type_ "hidden"
+              ! name "_id" ! id "_id"
+              ! value (toValue $ userId user)
+        span ! id "_id-group-help"
+             ! class_ "help-inline" $ ""
+      div ! class_ "btn-group" $ do
+        input ! type_ "submit" ! class_ "btn btn-primary" ! value "Update"
+        input ! type_ "reset" ! class_ "btn" ! value "Reset"
 --
 -- Tags
 --
