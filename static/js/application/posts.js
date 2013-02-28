@@ -103,7 +103,12 @@ $(document).ready(function() {
   		         , data : $("#editPost").serialize()}
   						).done(function() {
   						    if(do_preview) { refresh_preview(); }
-  						});
+  						}).fail(function() {
+  							 $("#main-alert-msg").html(
+  									"<i class=\"icon-warning-sign\"></i> "+
+  									"<strong>Server error:</strong> Save failed.");
+  							 $("#main-alert").show();
+							});
   	});
 
     $("#post-delete-btn").click( function () {
@@ -126,7 +131,12 @@ $(document).ready(function() {
   								$("#post-make-public-btn").hide();
   								$("#post-make-private-btn").show();
 									refresh_preview();
-  						});
+  						}).fail(function() {
+  							 $("#main-alert-msg").html(
+  									"<i class=\"icon-warning-sign\"></i> "+
+  									"<strong>Server error:</strong> Failed to make post public.");
+  							 $("#main-alert").show();
+							});
   	});
 
     $("#post-make-private-btn").click( function () {
@@ -138,7 +148,12 @@ $(document).ready(function() {
   								$("#post-make-private-btn").hide();
   								$("#post-make-public-btn").show();
 									refresh_preview();
-  						});
+  						}).fail(function() {
+  							 $("#main-alert-msg").html(
+  									"<i class=\"icon-warning-sign\"></i> "+
+  									"<strong>Server error:</strong> Failed to make post private.");
+  							 $("#main-alert").show();
+							});
   	});
 
 		var cur_users = [];
@@ -163,7 +178,15 @@ $(document).ready(function() {
 													removeFirst($(this).val(), cur_users);
 											});
 											process(cur_users);
-  		     			 });
+  					     }).fail(function() {
+									 // close modal
+									 $("#manageCollabs button[type=button].close").click();
+									 // show error message
+  					     	 $("#main-alert-msg").html(
+  					     			"<i class=\"icon-warning-sign\"></i> "+
+  					     			"<strong>Server error:</strong> Failed to add collaborator.");
+  					     	 $("#main-alert").show();
+						     });
 				 }
 		});
 
@@ -175,6 +198,10 @@ $(document).ready(function() {
 						$("#post-add-collaborator-btn").attr("disabled","");
 				}
 		});
+
+		$('#post-add-collaborator-help').popover({ html      : false
+																						 , placement : 'bottom'
+																						 , trigger   : 'hover'});
 
 		$("#post-add-collaborator-btn").click( function () {
 				var new_c = $("#post-add-collaborator").val();
@@ -215,14 +242,15 @@ $(document).ready(function() {
   				return $("<a>",
   					{ href : "#"
   					, click : function() {
+								// button in result 
+								var btn = '<button type="button" class="close" data-dismiss="alert">&times</button>';
   							// create result pre	
   							var res_id = "result-"+id;
   							if($("#"+res_id).length == 0) {
   							  $("<pre>", { id: res_id }).insertAfter($("#"+id));
   							}
-  							$("#"+res_id).html("<i class=\"icon-chevron-right\"></i>"+
-  													      " Executing...")
-  							             .attr("class","alert-info");
+  							$("#"+res_id).html(btn+"<i class=\"icon-repeat\"></i> Executing...")
+  							             .attr("class","alert alert-info");
   							// ask parent to resize iframe
   							window.parent.postMessage("preview-resize","*");
   							// execute code
@@ -233,27 +261,25 @@ $(document).ready(function() {
   																						 , "lang": $("#raw-"+id).data("lang")
   																						 , "source": $("#raw-"+id).text()})
   										 }).done(function(data) {
-  												 var result_class = "alert-error";
+  												 var result_class = "alert alert-error";
   												 if (data.code == 0) {
-														 result_class = "alert-success";
-  											   	 $("#"+res_id).html("<i class=\"icon-ok\"></i> ");
+														 result_class = "alert alert-success";
+  											   	 $("#"+res_id).html(btn+"<i class=\"icon-ok\"></i> ");
 													 } else {
-  											   	 $("#"+res_id).html("<i class=\"icon-remove\"></i> ");
+  											   	 $("#"+res_id).html(btn+"<i class=\"icon-remove\"></i> ");
 													 }
   												 $("#"+res_id).attr("class",result_class);
   												 $("<b>", { text : data.result }).appendTo($("#"+res_id))
   												 window.parent.postMessage("preview-resize","*");
   										 }).fail(function(data) {
-  												 $("#"+res_id).attr("class","alert-error");
-  												 $("#"+res_id).html("<i class=\"icon-warning-sign\"></i> ");
-  												 $("<strong>", { text : "Sorry, this seems like a server error." }).appendTo($("#"+res_id))
+  												 $("#"+res_id).attr("class","alert alert-error");
+  												 $("#"+res_id).html(btn+"<i class=\"icon-warning-sign\"></i> ");
+  												 $("<strong>", { text : "Sorry, this seems like a server error."
+													               }).appendTo($("#"+res_id))
 											 });
-												
-								
   							return false;
   						}
-  				  , html : "<i class=\"icon-cog\"></i>Execute"}).attr("class",
-  																															"pull-right");
+  				  , html : "<i class=\"icon-cog\"></i>Execute"}).attr("class", "pull-right");
   			};
   			var ctrl = mkController(c_blk.id);
   			ctrl.appendTo(c_blk);

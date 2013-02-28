@@ -51,12 +51,12 @@ respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
            ul ! class_ "nav pull-right" $
              maybe publicMenu userMenu muser
      div ! class_ "container" $ do
-       div ! id "login-alert" ! class_ "alert alert-error"
+       div ! id "main-alert" ! class_ "alert alert-error"
            ! A.style "display: none" $ do
          button ! type_ "button" ! class_ "close"
                 ! dataAttribute "dismiss" "alert" $ 
                 preEscapedToHtml ("&times;" :: Text)
-         span ! id "login-alert-msg" $ ""
+         span ! id "main-alert-msg" $ ""
        div $ content
       where publicMenu = do
               li $ a ! href "#" ! id "login" $ do
@@ -219,9 +219,8 @@ editPost post = do
     ul ! class_ "breadcrumb" $ do
        li $ "Preview..."
        li ! class_ "pull-right" $ do
-         a ! href "#"
-           ! id "refresh-post-preview-btn"
-           ! A.title "Refresh" $ i ! class_ "icon-refresh" $ ""
+         a ! href "#" ! id "post-refresh-preview-btn" $
+           i ! class_ "icon-refresh" $ ""
     iframe ! id "post-preview-body"
            ! src (toValue $ "/posts/" ++ (show $ getPostId post))
            $ ""
@@ -246,6 +245,17 @@ editPost post = do
       button ! type_ "button" ! class_ "close"
              ! dataAttribute "dismiss" "modal" $ "x"
       h3 $ "Manage collaborators"
+      a ! href "#"
+        ! class_ "text-warning"
+        ! id "post-add-collaborator-help"
+        ! dataAttribute "toggle" "popover"
+        ! dataAttribute "original-title" "What is a collaborator?"
+        ! dataAttribute "content"
+          "A collaborator can read, modify, and delete your post.\
+          \ They may also add and remove other collaborators.\
+          \ However, a collaborator cannot remove or change the\
+          \ owner."
+         $ small "What is a collaborator?"
     div ! class_ "modal-body" $ do
       ul ! class_ "nav nav-list" ! id "currentCollabs" $ do
         li ! class_ "nav-header" $ "Owner"
@@ -259,7 +269,7 @@ editPost post = do
                       ! dataAttribute "collaborator" (toValue c) $
                    i ! class_ "icon-trash" $ ""
                
-    div ! class_ "modal-footer" $ 
+    div ! class_ "modal-footer" $  do
       div ! class_ "input-append inline" $ do
         input ! type_ "text"
               ! id "post-add-collaborator"
