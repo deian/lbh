@@ -68,7 +68,7 @@ respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
                   ! dataAttribute "toggle" "dropdown" $ do
                     img ! src (toValue $ T.concat [
                       "https://secure.gravatar.com/avatar/"
-                      , md5 (userEmail u), "?s=16"])
+                      , md5 (userEmail u), "?s=24"])
                     " "
                     toHtml $ userId u
                     b ! class_ "caret" $ ""
@@ -105,6 +105,8 @@ welcome musr = do
    div ! class_ "row-fluid" $ div ! class_ "thumbnails" $ do
      li ! class_ "span4" $ div ! class_ "thumbnail main-topic" $ do
        div ! class_ "caption" $ do
+         span ! class_ "pictogram pull-right" $
+           preEscapedToHtml ("&#128214;" :: Text)
          h3 ! class_ "text-info" $ "Learn"
          p $ do "Learn a new programming language interactively"
                 " by "
@@ -119,10 +121,12 @@ welcome musr = do
                 " "
                 a ! class_ "btn" ! href "/tags" $ do
                   i ! class_ "icon-tags" $ ""
-                  " Browser Tags"
+                  " Show Tags"
      li ! class_ "span4" $ div ! class_ "thumbnail main-topic" $ do
        div ! class_ "caption" $ do
-         h3 ! class_ "text-info" $ "Teach"
+         span ! class_ "pictogram pull-right" $
+           preEscapedToHtml ("&#59196;" :: Text)
+         h3 ! class_ "text-info" $ "Create"
          p $ do "Use LearnByHacking to write " >> strong "active"
                 " tutorials, lectures or blog posts on you favorite"
                 " programming language. Let your readers execute"
@@ -138,11 +142,13 @@ welcome musr = do
                          " Login with Persona"
      li ! class_ "span4" $ div ! class_ "thumbnail main-topic" $ do
        div ! class_ "caption" $ do
+         span ! class_ "pictogram pull-right" $
+           preEscapedToHtml ("&#59168;" :: Text)
          h3 ! class_ "text-info" $ "Share"
          p $ do "Collaborate on tutorials, lectures, blog posts,"
                 " etc. with other users. You can create " >> em "private"
                 " posts that are only shared with a select few."
-                " Alternatively, you can make your content available to"
+                " Alternatively, make your content available to"
                 " the general " >> em "public."
          p $ do a ! class_ "btn btn-primary" ! href "/users" $ do
                     i ! class_ "icon-th icon-white" $ ""
