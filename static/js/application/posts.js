@@ -284,6 +284,8 @@ $(document).ready(function() {
   			var ctrl = mkController(c_blk.id);
   			ctrl.appendTo(c_blk);
   	});
+
+
   })();
 
 });

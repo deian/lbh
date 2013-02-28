@@ -143,13 +143,16 @@ usersController = do
   REST.show $ maybeRegister $ do
     mu <- currentUser
     (Just uid) <- queryParam "id"
-    (muser, ps) <- liftLIO . withLBHPolicy $ do
+    liftLIO . withLBHPolicy $ do
       muser <- findBy "users" "_id" uid
-      ps <- maybe (return [])
+      os <- maybe (return [])
                   (\o -> findAll $ select ["owner" -: userId o] "posts") muser
-      return (muser, ps)
-    return $ maybe notFound
-                   (respondHtml mu . (\u -> showUser u ps (mu==muser))) muser
+      let qry u = ["$in" -: [userId u]] :: BsonDocument
+      cs <- maybe (return [])
+                  (\u -> findAll $ select ["collaborators" -: qry u] "posts")
+                  muser
+      return $ maybe notFound
+                   (respondHtml mu . (\u -> showUser u os cs (mu==muser))) muser
   REST.edit $ withAuthUser $ \usr -> do
     (Just uid) <- queryParam "id"
     if (T.unpack (userId usr) /= S8.unpack uid)
@@ -201,8 +204,7 @@ tagsController = do
     mu <- currentUser
     Just tag <- queryParam "id"
     ups <- liftLIO . withLBHPolicy $ do
-      let qry :: BsonDocument
-          qry = ["$in" -: [tag]]
+      let qry = ["$in" -: [tag]] :: BsonDocument
       ps <- findAll (select ["tags" -: qry] "posts")
       forM ps $ \p-> do
         u <- findBy  "users" "_id" (postOwner p)

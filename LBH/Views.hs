@@ -18,7 +18,8 @@ import qualified Data.Digest.Pure.MD5 as MD5
 import           Hails.Web hiding (body)
 import           Hails.HttpServer.Types
 import           Text.Blaze.Html5 hiding (Tag)
-import           Text.Blaze.Html5.Attributes hiding (label, form, span, title, style)
+import           Text.Blaze.Html5.Attributes hiding ( label, form, span
+                                                    , title, style)
 import qualified Text.Blaze.Html5.Attributes as A
 import           Text.Blaze.Html.Renderer.Utf8
 
@@ -368,10 +369,30 @@ showPost muser post = do
         i ! class_ "icon-time" $ ""
         toHtml $ " " ++ showDate (postDate post)
       li $ "|"
-      li $ a ! href (toValue $ "/users/" `T.append` postOwner post) $ do
-        i ! class_ "icon-user" $ ""
-        " "
-        toHtml $ postOwner post
+      if null $ postCollaborators post
+        then li $ a ! href (toValue $ "/users/" `T.append` postOwner post) $ do
+               i ! class_ "icon-user" $ ""
+               " "
+               toHtml $ postOwner post
+        else li $ do
+               span ! class_ "dropdown" $ do
+                 a ! href "#" ! class_ "dropdown-toggle"
+                   ! dataAttribute "toggle" "dropdown" $ do
+                     span ! class_ "icon-entypo" $
+                      preEscapedToHtml ("&#128101;" :: Text)
+                     " "
+                     toHtml $ postOwner post
+                     " "
+                     span ! class_ "caret" $ ""
+                 ul ! class_ "dropdown-menu" $ do
+                   li ! class_ "nav-header" $ "Owner"
+                   li $ a ! href (toValue $ "/users/" `T.append`
+                                            postOwner post) $ do
+                         toHtml $ postOwner post
+                   li ! class_ "nav-header" $ "Collaborators"
+                   forM_ (postCollaborators post) $ \c ->
+                     li $ a ! href (toValue $ "/users/" `T.append` c)
+                            ! tabindex "-1" $ toHtml c
       when (isJust muser &&
             (userId . fromJust $ muser)
                  `elem` (postOwner post : postCollaborators post)) $ do
@@ -469,8 +490,8 @@ indexUsers musr ps = do
                  " edit "
             div $ toHtml $ userFullName user
 
-showUser :: User -> [Post] -> Bool -> Html
-showUser user ps isCurrentUser = do
+showUser :: User -> [Post] -> [Post] -> Bool -> Html
+showUser user ownPS colPS isCurrentUser = do
   div ! class_ "page-header" $ do
     ul ! class_ "media-list " $ do
       li ! class_ "media" $ do
@@ -485,18 +506,25 @@ showUser user ps isCurrentUser = do
         ! href (toValue $ T.concat ["/users/", userId user, "/edit"]) $ do
         i ! class_ "icon-wrench icon-white" $ ""
         " Edit account"
-  ul ! class_ "nav nav-pills nav-stacked" $ do
-    forM_ ps $ \post -> do
-      let postUrl = "/posts/" ++ show (getPostId post)
-      li $ do
-          a ! href (toValue postUrl) $ do
-            i ! class_ (snd $ privInfo post) $ ""
-            " "
-            toHtml $ postTitle post
-            span ! class_ "pull-right" $ toHtml $ showDate (postDate post)
+  when (not . null $ ownPS) $ do
+    h5 $ "Owns:"
+    ul ! class_ "nav nav-pills nav-stacked" $ do
+      forM_ ownPS $ doShowPost 
+  when (not . null $ colPS) $ do
+    h5 $ "Collaborator on:"
+    ul ! class_ "nav nav-pills nav-stacked" $ do
+      forM_ colPS $ doShowPost 
   where privInfo p = if postIsPublic p
                        then ("Public post", "icon-globe")
                        else ("Private post", "icon-lock")
+        doShowPost post = 
+          let postUrl = "/posts/" ++ show (getPostId post)
+          in li $ do
+              a ! href (toValue postUrl) $ do
+                i ! class_ (snd $ privInfo post) $ ""
+                " "
+                toHtml $ postTitle post
+                span ! class_ "pull-right" $ toHtml $ showDate (postDate post)
 
 newUser :: UserName -> Html
 newUser uemail = do
