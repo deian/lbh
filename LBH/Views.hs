@@ -47,7 +47,7 @@ respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
          ! id "page-nav" $ do
        div ! class_ "navbar-inner" $ do
          div ! class_ "container" $ do
-           a ! href "/" ! class_ "brand" $ "Learn By Hacking" 
+           a ! href "/" ! class_ "brand" $ "LearnByHacking" 
            ul ! class_ "nav pull-right" $
              maybe publicMenu userMenu muser
      div ! class_ "container" $ do
@@ -90,6 +90,73 @@ respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
 stylesheet :: String -> Html
 stylesheet uri = link ! rel "stylesheet" 
                       ! type_ "text/css" ! href (toValue uri)
+
+--
+-- Welcome
+--
+
+welcome :: Maybe User -> Html
+welcome musr = do
+  stylesheet "/static/css/application/welcome.css"
+  a ! href "https://github.com/deian/lbh" $ do
+    img ! class_ "github-fork"
+        ! src "/static/img/github-fork.png"
+  div ! id "welcome" $ div ! class_ "container" $ do
+   div ! class_ "row-fluid" $ div ! class_ "thumbnails" $ do
+     li ! class_ "span4" $ div ! class_ "thumbnail main-topic" $ do
+       div ! class_ "caption" $ do
+         h3 ! class_ "text-info" $ "Learn"
+         p $ do "Learn a new programming language interactively"
+                " by "
+                em "running example code snippets."
+                " Test your knowledge by " >> strong "hacking" 
+                preEscapedToHtml ("&mdash;" :: Text)
+                "implement programs as posts and run them"
+                " without installing any tools!"
+         p $ do a ! class_ "btn btn-primary" ! href "/posts" $ do
+                    i ! class_ "icon-list icon-white" $ ""
+                    " Browse Posts"
+                " "
+                a ! class_ "btn" ! href "/tags" $ do
+                  i ! class_ "icon-tags" $ ""
+                  " Browser Tags"
+     li ! class_ "span4" $ div ! class_ "thumbnail main-topic" $ do
+       div ! class_ "caption" $ do
+         h3 ! class_ "text-info" $ "Teach"
+         p $ do "Use LearnByHacking to write " >> strong "active"
+                " tutorials, lectures or blog posts on you favorite"
+                " programming language. Let your readers execute"
+                " code without installaling compilers or interpreters"
+                " on their machine!"
+         p $ if isJust musr
+               then do a ! class_ "btn btn-primary" ! href "/posts/new" $ do
+                         i ! class_ "icon-plus icon-white" $ ""
+                         " New Post"
+               else do a ! class_ "btn btn-primary" ! href "#"
+                         ! onclick "$(\"#login\").click()" $ do
+                         i ! class_ "icon-user icon-white" $ ""
+                         " Login with Persona"
+     li ! class_ "span4" $ div ! class_ "thumbnail main-topic" $ do
+       div ! class_ "caption" $ do
+         h3 ! class_ "text-info" $ "Share"
+         p $ do "Collaborate on tutorials, lectures, blog posts,"
+                " etc. with other users. You can create " >> em "private"
+                " posts that are only shared with a select few."
+                " Alternatively, you can make your content available to"
+                " the general " >> em "public."
+         p $ do a ! class_ "btn btn-primary" ! href "/users" $ do
+                    i ! class_ "icon-th icon-white" $ ""
+                    " View Users"
+                " "
+                if isJust musr
+                  then do a ! class_ "btn"
+                            ! href (toValue $ "/users/" `T.append` uid) $ do
+                            i ! class_ "icon-edit" $ ""
+                            " Edit Posts"
+                  else return ()
+
+      where uid = userId $ fromJust musr
+
 
 --
 -- Posts

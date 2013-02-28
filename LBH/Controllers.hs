@@ -38,7 +38,7 @@ server :: Application
 server = mkRouter $ do
   Frank.post "/users" usersCreate
   routeAll . personaLoginEmailToUid . mkRouter $ do
-    routeTop $ redirectTo "/posts/"
+    routeTop welcomeController
     routeName "users" usersController
     routeName "posts" postsController
     routeName "tags"   tagsController
@@ -219,6 +219,10 @@ loginController = do
         where def mu =  do u <- mu
                            return $ User u "" u
 
+welcomeController :: Controller Response
+welcomeController = maybeRegister $ do
+    mu <- currentUser
+    return $ respondHtml mu (welcome mu)
 
 --
 -- Helpers

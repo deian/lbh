@@ -1,0 +1,24 @@
+#welcome {
+	position: absolute;
+	top:50%;
+	height: 10em;
+	margin-top: -10em;
+}
+
+
+body {
+	/* Stock photo by Stasys Eidiejus from http://www.sxc.hu/photo/830250 */
+	background: #000000 url('/static/img/welcome.jpg') no-repeat left top;
+}
+
+.main-topic {
+	background-color: #ffffff;
+}
+
+.github-fork {
+  position: absolute;
+	top: 0;
+	right: 0;
+	border: 0;
+	z-index: 9999;
+}
