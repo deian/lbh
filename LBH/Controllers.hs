@@ -35,16 +35,15 @@ import           Data.Aeson (decode, encode, toJSON)
 import Debug.Trace
 
 server :: Application
-server =  do
-   mkRouter $ do
-     Frank.post "/users" usersCreate
-   personaLoginEmailToUid . mkRouter $ do
-     routeTop $ redirectTo "/posts/"
-     routeName "users" usersController
-     routeName "posts" postsController
-     routeName "tags"   tagsController
-     Frank.post "/exec" execController
-     Frank.get "/login" loginController
+server = mkRouter $ do
+  Frank.post "/users" usersCreate
+  routeAll . personaLoginEmailToUid . mkRouter $ do
+    routeTop $ redirectTo "/posts/"
+    routeName "users" usersController
+    routeName "posts" postsController
+    routeName "tags"   tagsController
+    Frank.post "/exec" execController
+    Frank.get "/login" loginController
   
 
 --

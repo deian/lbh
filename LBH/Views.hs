@@ -37,10 +37,10 @@ respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
     title "Learn By Hacking"
     stylesheet "/static/css/bootstrap.css"
     stylesheet "/static/css/application.css"
-    script ! src "https://login.persona.org/include.js" $ ""
     script ! src "/static/js/jquery.min.js" $ ""
     script ! src "/static/js/jquery.cookie.js" $ ""
     script ! src "/static/js/bootstrap.min.js" $ ""
+    script ! src "https://login.persona.org/include.js" $ ""
     script ! src "/static/js/application.js" $ ""
   body $ do
      div ! class_ "navbar navbar-fixed-top navbar-inverse"
@@ -50,7 +50,14 @@ respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
            a ! href "/" ! class_ "brand" $ "Learn By Hacking" 
            ul ! class_ "nav pull-right" $
              maybe publicMenu userMenu muser
-     div ! class_ "container" $ content
+     div ! class_ "container" $ do
+       div ! id "login-alert" ! class_ "alert alert-error"
+           ! A.style "display: none" $ do
+         button ! type_ "button" ! class_ "close"
+                ! dataAttribute "dismiss" "alert" $ 
+                preEscapedToHtml ("&times;" :: Text)
+         span ! id "login-alert-msg" $ ""
+       div $ content
       where publicMenu = do
               li $ a ! href "#" ! id "login" $ do
                span ! class_ "icon-user icon-white" $ ""
@@ -222,7 +229,8 @@ editPost post = do
   div ! id "confirmDelete" ! class_ "modal hide fade" ! tabindex "-1" $ do
     div ! class_ "modal-header" $ do
       button ! type_ "button" ! class_ "close"
-             ! dataAttribute "dismiss" "modal" $ "x"
+             ! dataAttribute "dismiss" "modal" $ 
+             preEscapedToHtml ("&times;" :: Text)
       h3 $ "Are you sure you want to delete post?"
     div ! class_ "modal-body" $ do
      p $ "Once you delete this post, you will not be able to\

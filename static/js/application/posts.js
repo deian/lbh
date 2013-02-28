@@ -1,11 +1,6 @@
 $(document).ready(function() {
 
 	//
-	// All
-	//
-	$("a[data-toggle=tooltip]").tooltip();
-
-	//
   // New and Edit
 	//
 		
@@ -90,8 +85,8 @@ $(document).ready(function() {
   	    $("#post-preview").hide();
   			preview_init = false;
   	  } else {
-  			// refresh preview content
-  			refresh_preview();
+  			// save and refresh preview content
+        $("#post-save-btn").click();
   		}
   		// toggle
   		do_preview=!do_preview;
@@ -251,7 +246,7 @@ $(document).ready(function() {
   										 }).fail(function(data) {
   												 $("#"+res_id).attr("class","alert-error");
   												 $("#"+res_id).html("<i class=\"icon-warning-sign\"></i> ");
-  												 $("<b>", { text : "Sorry, this seems like a server error." }).appendTo($("#"+res_id))
+  												 $("<strong>", { text : "Sorry, this seems like a server error." }).appendTo($("#"+res_id))
 											 });
 												
 								
