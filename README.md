@@ -33,7 +33,7 @@ sudo pacman -S cabal-install
 To avoid pwning your system in case of unknown vulnerabilities, let's create a new UID that we'll use to run LbH:
 
 ```bash
-sudo useradd -m -d /disk/hs08/lbh -s /bin/bash lbh
+sudo useradd -m -d /home/lbh -s /bin/bash lbh
 ```
 
 As user lbh, let's also install cabal-dev, as to avoid dependency nightmares on your system:
@@ -50,7 +50,7 @@ LbH depends on the Arch-specific jail tool we implemented. Hence, we must instal
 
 ```bash
 # Grab the LbH source:
-git clone git://github.com/deian/lbh.git
+git clone git://github.com/scslab/lbh.git
 # Grab the Arch jail tool and Haskell bindings:
 git clone git://github.com/scslab/cjail.git
 # Grab the Hails wrappers for the bindings:
