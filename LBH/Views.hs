@@ -99,7 +99,7 @@ stylesheet uri = link ! rel "stylesheet"
 welcome :: Maybe User -> Html
 welcome musr = do
   stylesheet "/static/css/application/welcome.css"
-  a ! href "https://github.com/deian/lbh" $ do
+  a ! href "https://github.com/scslab/lbh" $ do
     img ! class_ "github-fork"
         ! src "/static/img/github-fork.png"
   div ! id "welcome" $ div ! class_ "container" $ do
