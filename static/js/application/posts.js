@@ -1,35 +1,47 @@
 $(document).ready(function() {
 
-	//
-  // New and Edit
-	//
-		
-	if($(".tagManager").length > 0) {
-			var pre = "";
-			/* fill existing tags */
-			if($("#prefilled-tagsAggr").length>0) {
-					pre = $("#prefilled-tagsAggr").val();
-			}
-			$(".tagManager").tagsManager( { maxTags : 10 /* fake limit*/
-																		, prefilled : pre
-																		, typeahead : true
-																		, typeaheadAjaxSource : '/tags'
-																		//, typeaheadAjaxPolling : true
-																		});
-	}
+	if($("#newPost").length > 0 || $("#editPost").length > 0) {
+  	//
+    // New and Edit
+  	//
+  		
+  	if($(".tagManager").length > 0) {
+  			var pre = "";
+  			/* fill existing tags */
+  			if($("#prefilled-tagsAggr").length>0) {
+  					pre = $("#prefilled-tagsAggr").val();
+  			}
+  			$(".tagManager").tagsManager( { maxTags : 10 /* fake limit*/
+  																		, prefilled : pre
+  																		, typeahead : true
+  																		, typeaheadAjaxSource : '/tags'
+  																		//, typeaheadAjaxPolling : true
+  																		});
+  	}
+  
+  	var set_tags = function(postId) {
+  			if($("input[name=hidden-tagsAggr]").length>0) {
+  				$("input[name=hidden-tagsAggr]").val().split(",").map( function(t) {
+  						if(t !== "" && $("input[type=hidden][name=\"tags[]\"][value="
+  														 +t+"]").length==0) {
+  						   	$("<input>", { type : 'hidden'
+  						   							 , name : 'tags[]'
+  						   							 , value : t }).appendTo(postId);
+  						}
+  				});
+  			}
+  	}; 
+  
+  		
+  	var post_body = CodeMirror.fromTextArea($("#body")[0], {
+  		  lineWrapping: true
+      , theme : "elegant"
+  	});
 
-	var set_tags = function(postId) {
-			if($("input[name=hidden-tagsAggr]").length>0) {
-				$("input[name=hidden-tagsAggr]").val().split(",").map( function(t) {
-						if(t !== "" && $("input[type=hidden][name=\"tags[]\"][value="
-														 +t+"]").length==0) {
-						   	$("<input>", { type : 'hidden'
-						   							 , name : 'tags[]'
-						   							 , value : t }).appendTo(postId);
-						}
-				});
-			}
-	}; 
+		post_body.on("change", function(inst,chObj) {
+			$("#body").val(inst.getValue());
+		});
+	}
 	
 	(function () { 
    	//

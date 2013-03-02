@@ -172,8 +172,12 @@ welcome musr = do
 newPost :: User -> Html
 newPost usr = do
   stylesheet "/static/css/bootstrap-tagmanager.css"
+  stylesheet "/static/css/codemirror.css"
+  stylesheet "/static/css/codemirror/theme/elegant.css"
   stylesheet "/static/css/application/posts.css"
   script ! src "/static/js/bootstrap-tagmanager.js" $ ""
+  script ! src "/static/js/codemirror.js" $ ""
+  script ! src "/static/js/codemirror/mode/markdown/markdown.js" $ ""
   script ! src "/static/js/application/posts.js" $ ""
   --
   h1 $ "Create a new post"
@@ -213,8 +217,12 @@ newPost usr = do
 editPost :: Post -> Html
 editPost post = do
   stylesheet "/static/css/bootstrap-tagmanager.css"
+  stylesheet "/static/css/codemirror.css"
+  stylesheet "/static/css/codemirror/theme/elegant.css"
   stylesheet "/static/css/application/posts.css"
   script ! src "/static/js/bootstrap-tagmanager.js" $ ""
+  script ! src "/static/js/codemirror.js" $ ""
+  script ! src "/static/js/codemirror/mode/markdown/markdown.js" $ ""
   script ! src "/static/js/application/posts.js" $ ""
   --
   h1 $ "Edit post"
@@ -299,7 +307,7 @@ editPost post = do
            ! src (toValue $ "/posts/" ++ (show $ getPostId post))
            $ ""
   -- Delete confirmation modal
-  div ! id "confirmDelete" ! class_ "modal hide fade" ! tabindex "-1" $ do
+  div ! id "confirmDelete" ! class_ "modal hide fade"  $ do
     div ! class_ "modal-header" $ do
       button ! type_ "button" ! class_ "close"
              ! dataAttribute "dismiss" "modal" $ 
@@ -314,7 +322,7 @@ editPost post = do
        button ! type_ "button" ! class_ "btn btn-danger"
               ! id "post-delete-btn" $ "Delete"
   -- Collaborators modal
-  div ! id "manageCollabs" ! class_ "modal hide fade" ! tabindex "-1" $ do
+  div ! id "manageCollabs" ! class_ "modal hide fade" $ do
     div ! class_ "modal-header" $ do
       button ! type_ "button" ! class_ "close"
              ! dataAttribute "dismiss" "modal" $ "x"
@@ -391,8 +399,7 @@ showPost muser post = do
                          toHtml $ postOwner post
                    li ! class_ "nav-header" $ "Collaborators"
                    forM_ (postCollaborators post) $ \c ->
-                     li $ a ! href (toValue $ "/users/" `T.append` c)
-                            ! tabindex "-1" $ toHtml c
+                     li $ a ! href (toValue $ "/users/" `T.append` c) $ toHtml c
       when (isJust muser &&
             (userId . fromJust $ muser)
                  `elem` (postOwner post : postCollaborators post)) $ do
