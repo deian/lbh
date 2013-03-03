@@ -5,7 +5,7 @@ module LBH.ActiveCode ( Code(..)
                       , extractActieCodeBlocks
                       ) where
 
-import           Prelude hiding (div, id)
+import           Prelude hiding (id)
 
 import qualified Data.ByteString.Lazy.Char8 as L8
 import           Data.Aeson hiding (Result)
@@ -27,8 +27,8 @@ import           Text.Pandoc hiding (Code)
 import           ActiveCode.Languages (languages)
 
 import           Text.Blaze.Html.Renderer.String
-import           Text.Blaze.Html5 (div, dataAttribute, toHtml, toValue, (!))
-import           Text.Blaze.Html5.Attributes (id, class_)
+import           Text.Blaze.Html5 (textarea, dataAttribute, toHtml, toValue, (!))
+import           Text.Blaze.Html5.Attributes (id, name, class_)
 
 
 -- | Code from clients
@@ -80,12 +80,12 @@ extractFromBlock :: Block -> M [Block]
 extractFromBlock (CodeBlock attrs blk) | isActiveCode attrs
                                        && lang `elem` languages = do
   x <- freshVar
-  let _id = "active-" ++ lang ++ "-" ++ show x
-  return $ [(CodeBlock (_id , [lang, "active-code", "active-"++lang],[]) blk)
-           ,(RawBlock "html" $ renderHtml $ do
-              div ! id (toValue $ "raw-" ++ _id)
-                  ! class_ "raw-active-code"
-                  ! dataAttribute "lang" (toValue lang) $ toHtml blk)
+  let _id = "raw-active-code-" ++ show x
+  return $ [(RawBlock "html" $ renderHtml $ do
+              textarea ! id (toValue _id)
+                       ! name (toValue _id)
+                       ! class_ "raw-active-code"
+                       ! dataAttribute "lang" (toValue lang) $ toHtml blk)
             ]
  where isActiveCode = isJust . getActiveLang
        getActiveLang (_,(x:_),_) = stripPrefix "active-" x

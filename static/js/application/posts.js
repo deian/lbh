@@ -249,29 +249,30 @@ $(document).ready(function() {
   	// Show
   	//
   
-  	$.map($(".active-code"), function(c_blk) {
-  			var mkController = function(id) {
+  	$(".raw-active-code").map( function() {
+  			var mkController = function(div_id, id) {
+					// reate the [cog] Execute link
   				return $("<a>",
   					{ href : "#"
   					, click : function() {
 								// button in result 
 								var btn = '<button type="button" class="close" data-dismiss="alert">&times</button>';
-  							// create result pre	
+  							// create code executing result <pre>:
   							var res_id = "result-"+id;
   							if($("#"+res_id).length == 0) {
-  							  $("<pre>", { id: res_id }).insertAfter($("#"+id));
+  							  $("<pre>", { id: res_id }).appendTo($("#"+div_id));
   							}
   							$("#"+res_id).html(btn+"<i class=\"icon-repeat\"></i> Executing...")
   							             .attr("class","alert alert-info");
   							// ask parent to resize iframe
   							window.parent.postMessage("preview-resize","*");
-  							// execute code
+  							// AJAX to execute code
   							$.ajax({ url:'/exec'
   										 , type: 'POST'
   										 , contentType: 'application/json'
   										 , data : JSON.stringify({ "id": id
-  																						 , "lang": $("#raw-"+id).data("lang")
-  																						 , "source": $("#raw-"+id).text()})
+  																						 , "lang": $("#"+id).data("lang")
+  																						 , "source": $("#"+id).text()})
   										 }).done(function(data) {
   												 var result_class = "alert alert-error";
   												 if (data.code == 0) {
@@ -291,11 +292,47 @@ $(document).ready(function() {
 											 });
   							return false;
   						}
-  				  , html : "<i class=\"icon-cog\"></i>Execute"}).attr("class", "pull-right");
+  				  , html : "<i class=\"icon-cog\"></i>run"})
   			};
-  			var ctrl = mkController(c_blk.id);
-  			ctrl.appendTo(c_blk);
-  	});
+				// -- 
+				var raw = $(this);
+				var id = raw[0].id;
+				var div_id = id.replace(/^raw-/,'');
+				raw.wrap('<div class="active-code" id="'+div_id+'" />');
+				//
+				var mode = raw.data("lang");
+				// code mirror treats C-like languages the same, let's
+				// make sure we highlight C/C++ code
+				switch(mode) {
+					case "c"  : mode = "text/x-csrc"  ; break;
+					case "cpp": mode = "text/x-c++src"; break;
+				}
+				//
+						
+				// create editor
+			  var cm  = CodeMirror.fromTextArea(raw[0], { lineWrapping: true
+	                                         	      , theme: "elegant"
+	                                                , mode: mode
+																									, lineNumbers: true
+	                                                });
+
+				// make sure text field (used to exec) is updated:
+		    cm.on("change", function(inst,chObj) {
+						raw.text(inst.getValue());
+				});
+
+				// Create active-code controller
+  			var exec = mkController(div_id,id);
+				$("<div>",
+					{ class : "row"
+					, html : $("<div>", { class : "span12"
+															, html : $("<ul>", { class : "nav active-controller"
+																									, html : $("<li>", { class : "active"
+																																		 , html : exec })
+																								  })
+															})
+									 }).appendTo($("#"+div_id));
+		});
 
 
   })();

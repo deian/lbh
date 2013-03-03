@@ -367,7 +367,20 @@ editPost post = do
 
 showPost :: Maybe User -> Post -> Html
 showPost muser post = do
+  stylesheet "/static/css/codemirror.css"
+  stylesheet "/static/css/codemirror/theme/elegant.css"
   stylesheet "/static/css/application/posts.css"
+  stylesheet "/static/css/application/posts/show.css"
+  script ! src "/static/js/codemirror.js" $ ""
+  script ! src "/static/js/codemirror/mode/clike/clike.js" $ ""
+--  script ! src "/static/js/codemirror/mode/go/go.js" $ ""
+  script ! src "/static/js/codemirror/mode/haskell/haskell.js" $ ""
+  script ! src "/static/js/codemirror/mode/javascript/javascript.js" $ ""
+--  script ! src "/static/js/codemirror/mode/ocaml/ocaml.js" $ ""
+--  script ! src "/static/js/codemirror/mode/perl/perl.js" $ ""
+--  script ! src "/static/js/codemirror/mode/python/python.js" $ ""
+--  script ! src "/static/js/codemirror/mode/ruby/ruby.js" $ ""
+--  script ! src "/static/js/codemirror/mode/shell/shell.js" $ ""
   script ! src "/static/js/application/posts.js" $ ""
   -- Include post header
   div ! class_ "page-header" ! id "post-header" $ do
