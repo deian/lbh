@@ -263,7 +263,7 @@ $(document).ready(function() {
   							  $("<pre>", { id: res_id }).appendTo($("#"+div_id));
   							}
   							$("#"+res_id).html(btn+"<i class=\"icon-repeat\"></i> Executing...")
-  							             .attr("class","alert alert-info");
+  							             .attr("class","exec-result alert alert-infoexec-result");
   							// ask parent to resize iframe
   							window.parent.postMessage("preview-resize","*");
   							// AJAX to execute code
@@ -274,9 +274,9 @@ $(document).ready(function() {
   																						 , "lang": $("#"+id).data("lang")
   																						 , "source": $("#"+id).text()})
   										 }).done(function(data) {
-  												 var result_class = "alert alert-error";
+  												 var result_class = "exec-result alert alert-error";
   												 if (data.code == 0) {
-														 result_class = "alert alert-success";
+														 result_class = "exec-result alert alert-success";
   											   	 $("#"+res_id).html(btn+"<i class=\"icon-ok\"></i> ");
 													 } else {
   											   	 $("#"+res_id).html(btn+"<i class=\"icon-remove\"></i> ");
@@ -285,20 +285,22 @@ $(document).ready(function() {
   												 $("<b>", { text : data.result }).appendTo($("#"+res_id))
   												 window.parent.postMessage("preview-resize","*");
   										 }).fail(function(data) {
-  												 $("#"+res_id).attr("class","alert alert-error");
+  												 $("#"+res_id).attr("class","exec-result alert alert-error");
   												 $("#"+res_id).html(btn+"<i class=\"icon-warning-sign\"></i> ");
   												 $("<strong>", { text : "Sorry, this seems like a server error."
 													               }).appendTo($("#"+res_id))
 											 });
   							return false;
   						}
-  				  , html : "<i class=\"icon-cog\"></i>run"})
+						, class : "btn btn-inverse btn-mini pull-right"
+  				  , html : "<i class=\"icon-cog icon-white\"></i>EXECUTE"})
   			};
-				// -- 
+
+				// ----------------------------------------------------------------
 				var raw = $(this);
 				var id = raw[0].id;
 				var div_id = id.replace(/^raw-/,'');
-				raw.wrap('<div class="active-code" id="'+div_id+'" />');
+				raw.wrap('<div class="active-code row" id="'+div_id+'" />');
 				//
 				var mode = raw.data("lang");
 				// code mirror treats C-like languages the same, let's
@@ -323,15 +325,8 @@ $(document).ready(function() {
 
 				// Create active-code controller
   			var exec = mkController(div_id,id);
-				$("<div>",
-					{ class : "row"
-					, html : $("<div>", { class : "span12"
-															, html : $("<ul>", { class : "nav active-controller"
-																									, html : $("<li>", { class : "active"
-																																		 , html : exec })
-																								  })
-															})
-									 }).appendTo($("#"+div_id));
+				$("<div>", { class : "active-controller-btn"
+									 , html : exec }).appendTo($("#"+div_id));
 		});
 
 
