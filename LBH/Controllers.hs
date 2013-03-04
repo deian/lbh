@@ -173,8 +173,8 @@ usersController = do
 
 execController :: Controller Response
 execController = maybeRegister $ do
-  ct <- requestHeader "content-type"
-  if ct /= Just "application/json"
+  isJSON <- isPrefixOf' "application/json" `liftM` requestHeader "content-type"
+  if not isJSON
     then return badRequest
     else do obj <- decode `liftM` body
             case obj of
@@ -182,6 +182,9 @@ execController = maybeRegister $ do
               Just c -> do
                 r <- liftLIO $ execCode c
                 return $ ok "application/json" (encode r)
+   where isPrefixOf' x (Just xs) = x `S8.isPrefixOf` xs
+         isPrefixOf' _ _ = False
+         
 
 --
 -- Search

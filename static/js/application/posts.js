@@ -251,7 +251,7 @@ $(document).ready(function() {
   
   	$(".raw-active-code").map( function() {
   			var mkController = function(div_id, id) {
-					// reate the [cog] Execute link
+					// create the [cog] Execute link
   				return $("<a>",
   					{ href : "#"
   					, click : function() {
@@ -300,7 +300,7 @@ $(document).ready(function() {
 				var raw = $(this);
 				var id = raw[0].id;
 				var div_id = id.replace(/^raw-/,'');
-				raw.wrap('<div class="active-code row" id="'+div_id+'" />');
+				raw.wrap('<div class="active-code span12" id="'+div_id+'" />');
 				//
 				var mode = raw.data("lang");
 				// code mirror treats C-like languages the same, let's
