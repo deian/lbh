@@ -32,7 +32,6 @@ import           LBH.Views
 import           LBH.ActiveCode
 import           Data.Aeson (decode, encode, toJSON)
 
-import Debug.Trace
 
 server :: Application
 server = mkRouter $ do

@@ -45,7 +45,6 @@ import           LIO.DCLabel
 import           LIO.DCLabel.Core
 import           LIO.DCLabel.Privs.TCB (allPrivTCB)
 
-import Debug.Trace
 --
 -- Policy
 --

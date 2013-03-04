@@ -30,7 +30,6 @@ import qualified Text.Pandoc.Highlighting as P
 
 import           LBH.ActiveCode (extractActieCodeBlocks)
 
-import Debug.Trace
 
 respondHtml :: Maybe User -> Html -> Response
 respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
