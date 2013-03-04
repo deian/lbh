@@ -14,8 +14,8 @@
   display: block;
   margin: 0 0 -10px;
   -webkit-border-radius: 4px;
-     -moz-border-radius: 4px;
-          border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
 }
 
 .exec-result {

@@ -99,6 +99,7 @@ stylesheet uri = link ! rel "stylesheet"
 welcome :: Maybe User -> Html
 welcome musr = do
   stylesheet "/static/css/application/welcome.css"
+  script ! src "/static/js/application/welcome.js" $ ""
   a ! href "https://github.com/scslab/lbh" $ do
     img ! class_ "github-fork"
         ! src "/static/img/github-fork.png"
@@ -116,13 +117,14 @@ welcome musr = do
                 preEscapedToHtml ("&mdash;" :: Text)
                 "implement programs as posts and run them"
                 " without installing any tools!"
-         p $ do a ! class_ "btn btn-primary" ! href "/posts" $ do
-                    i ! class_ "icon-list icon-white" $ ""
-                    " Browse Posts"
-                " "
-                a ! class_ "btn" ! href "/tags" $ do
-                  i ! class_ "icon-tags" $ ""
-                  " Show Tags"
+       div $ do
+         a ! class_ "btn btn-primary" ! href "/posts" $ do
+             i ! class_ "icon-list icon-white" $ ""
+             " Browse Posts"
+         " "
+         a ! class_ "btn" ! href "/tags" $ do
+           i ! class_ "icon-tags" $ ""
+           " Show Tags"
      li ! class_ "span4" $ div ! class_ "thumbnail main-topic" $ do
        div ! class_ "caption" $ do
          span ! class_ "pictogram pull-right" $
@@ -131,16 +133,16 @@ welcome musr = do
          p $ do "Use LearnByHacking to write " >> strong "active"
                 " tutorials, lectures or blog posts on you favorite"
                 " programming language. Let your readers execute"
-                " code without installaling compilers or interpreters"
-                " on their machine!"
-         p $ if isJust musr
-               then do a ! class_ "btn btn-primary" ! href "/posts/new" $ do
-                         i ! class_ "icon-plus icon-white" $ ""
-                         " New Post"
-               else do a ! class_ "btn btn-primary" ! href "#"
-                         ! onclick "$(\"#login\").click()" $ do
-                         i ! class_ "icon-user icon-white" $ ""
-                         " Login with Persona"
+                " code without installing tools on their machine!"
+       div $ do
+         if isJust musr
+           then do a ! class_ "btn btn-primary" ! href "/posts/new" $ do
+                     i ! class_ "icon-plus icon-white" $ ""
+                     " New Post"
+           else do a ! class_ "btn btn-primary" ! href "#"
+                     ! onclick "$(\"#login\").click()" $ do
+                     i ! class_ "icon-user icon-white" $ ""
+                     " Login with Persona"
      li ! class_ "span4" $ div ! class_ "thumbnail main-topic" $ do
        div ! class_ "caption" $ do
          span ! class_ "pictogram pull-right" $
@@ -151,16 +153,17 @@ welcome musr = do
                 " posts that are only shared with a select few."
                 " Alternatively, make your content available to"
                 " the general " >> em "public."
-         p $ do a ! class_ "btn btn-primary" ! href "/users" $ do
-                    i ! class_ "icon-th icon-white" $ ""
-                    " View Users"
-                " "
-                if isJust musr
-                  then do a ! class_ "btn"
-                            ! href (toValue $ "/users/" `T.append` uid) $ do
-                            i ! class_ "icon-edit" $ ""
-                            " Edit Posts"
-                  else return ()
+       div $ do
+         a ! class_ "btn btn-primary" ! href "/users" $ do
+             i ! class_ "icon-th icon-white" $ ""
+             " View Users"
+         " "
+         if isJust musr
+           then do a ! class_ "btn"
+                     ! href (toValue $ "/users/" `T.append` uid) $ do
+                     i ! class_ "icon-edit" $ ""
+                     " Edit Posts"
+           else return ()
 
       where uid = userId $ fromJust musr
 
