@@ -273,10 +273,15 @@ editPost post = do
           ! dataAttribute "toggle" "button" $ do
             i ! class_ "icon-eye-open" $ ""
             " Preview"
+        a ! class_ "btn btn-primary"
+          ! href (toValue $ "/posts/" ++ show (getPostId post)) $ do
+            i ! class_ "icon-arrow-left icon-white" $ ""
+            " Go to post"
       div ! class_ "btn-group pull-right dropup" $ do
         button ! class_ "btn" 
                ! dataAttribute "toggle" "dropdown" $ do
                     i ! class_ "icon-wrench" $ ""
+                    " Settings"
         ul ! class_ "dropdown-menu" $ do
           li $ a ! (if postIsPublic post
                       then A.style "display: none"
