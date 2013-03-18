@@ -263,7 +263,7 @@ $(document).ready(function() {
   							  $("<pre>", { id: res_id }).appendTo($("#"+div_id));
   							}
   							$("#"+res_id).html(btn+"<i class=\"icon-repeat\"></i> Executing...")
-  							             .attr("class","exec-result alert alert-infoexec-result");
+  							             .attr("class","exec-result alert alert-info");
   							// ask parent to resize iframe
   							window.parent.postMessage("preview-resize","*");
   							// AJAX to execute code

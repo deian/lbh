@@ -16,7 +16,7 @@ ul#index-posts li:hover {
 #post-preview-body {
   min-height:250px;
   width:100%;
-	overflow:auto;
+	overflow:hidden;
 	border:0px;
 }
 

@@ -103,7 +103,7 @@ welcome musr = do
     img ! class_ "github-fork"
         ! src "/static/img/github-fork.png"
   div ! id "welcome" $ div ! class_ "container" $ do
-   div ! class_ "row-fluid" $ div ! class_ "thumbnails" $ do
+   div ! class_ "row" $ div ! class_ "thumbnails" $ do
      li ! class_ "span4" $ div ! class_ "thumbnail main-topic" $ do
        div ! class_ "caption" $ do
          span ! class_ "pictogram pull-right" $
