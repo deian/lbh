@@ -36,6 +36,9 @@ $(document).ready(function() {
   	var post_body = CodeMirror.fromTextArea($("#body")[0], {
   		  lineWrapping: true
       , theme : "elegant"
+			, viewportMargin: Infinity
+			, lineNumbers: true
+			, collapseRange: true
   	});
 
 		post_body.on("change", function(inst,chObj) {

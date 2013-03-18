@@ -1,6 +1,4 @@
-textarea#body { height:250px; }
-
-textarea#body { height:250px; }
+textarea#body { min-height:250px; }
 
 
 ul#index-posts li {
@@ -40,4 +38,15 @@ ul#index-posts li:hover {
      -moz-transition: border linear 0.2s, box-shadow linear 0.2s;
        -o-transition: border linear 0.2s, box-shadow linear 0.2s;
           transition: border linear 0.2s, box-shadow linear 0.2s;
+	height:100%;
+}
+
+.CodeMirror-scroll {
+	overflow-y: hidden;
+	overflow-x: hidden;
+}
+
+.CodeMirror-collapserange {
+	width: .6em;
+	background-color: #eee;
 }
