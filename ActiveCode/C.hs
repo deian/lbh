@@ -16,19 +16,19 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
 c :: L8.ByteString -> IO ()
-c = clang ".c"
+c = clang "clang" ".c"
 
 cpp :: L8.ByteString -> IO ()
-cpp = clang ".cpp"
+cpp = clang "clang++" ".cpp"
 
-clang :: String -> L8.ByteString -> IO ()
-clang ext src = do
+clang :: String -> String -> L8.ByteString -> IO ()
+clang cc ext src = do
   fp <- bracket (mkstemps "/tmp/activeC" ext)
                 (hClose . snd)
                 (\(f,h) -> L8.hPut h src >> return (dropExtension f))
   let rpl = T.replace (T.pack $ fp++ext) "<user-input>" 
   -- compile
-  (ccode,_,cerr') <- readProcessWithExitCode "clang" ["-o",fp,fp++ext] ""
+  (ccode,_,cerr') <- readProcessWithExitCode cc ["-o",fp,fp++ext] ""
   let cerr = rpl $ T.pack cerr'
   unless (ccode == ExitSuccess) $ T.putStr cerr >> exitWith ccode
   -- run
