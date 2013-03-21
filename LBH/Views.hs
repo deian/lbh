@@ -180,6 +180,7 @@ newPost usr = do
   script ! src "/static/js/bootstrap-tagmanager.js" $ ""
   script ! src "/static/js/codemirror.js" $ ""
   script ! src "/static/js/codemirror/mode/markdown/markdown.js" $ ""
+  script ! src "/static/js/codemirror/collapserange.js" $ ""
   script ! src "/static/js/application/posts.js" $ ""
   --
   h1 $ "Create a new post"
