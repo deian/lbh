@@ -162,7 +162,7 @@ welcome musr = do
            else return ()
    div ! class_ "row-fluid text-center" $ small $ do
        "fork me on: "
-       a ! href "https://www.gitstar.com/scs/lbh" $ "gitstar"
+       a ! href "http://www.gitstar.com/deian/lbh" $ "gitstar"
        " "
        a ! href "https://www.github.com/scslab/lbh" $ "github"
 
