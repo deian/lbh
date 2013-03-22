@@ -46,11 +46,11 @@ respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
      div ! class_ "navbar navbar-fixed-top navbar-inverse"
          ! id "page-nav" $ do
        div ! class_ "navbar-inner" $ do
-         div ! class_ "container" $ do
+         div ! class_ "container-fluid" $ do
            a ! href "/" ! class_ "brand" $ "LearnByHacking" 
            ul ! class_ "nav pull-right" $
              maybe publicMenu userMenu muser
-     div ! class_ "container" $ do
+     div ! class_ "container-fluid container-lbh" $ do
        div ! id "main-alert" ! class_ "alert alert-error"
            ! A.style "display: none" $ do
          button ! type_ "button" ! class_ "close"
@@ -99,11 +99,8 @@ welcome :: Maybe User -> Html
 welcome musr = do
   stylesheet "/static/css/application/welcome.css"
   script ! src "/static/js/application/welcome.js" $ ""
-  a ! href "https://github.com/scslab/lbh" $ do
-    img ! class_ "github-fork"
-        ! src "/static/img/github-fork.png"
   div ! id "welcome" $ div ! class_ "container" $ do
-   div ! class_ "row" $ div ! class_ "thumbnails" $ do
+   div ! class_ "row-fluid" $ div ! class_ "thumbnails" $ do
      li ! class_ "span4" $ div ! class_ "thumbnail main-topic" $ do
        div ! class_ "caption" $ do
          span ! class_ "pictogram pull-right" $
@@ -163,6 +160,11 @@ welcome musr = do
                      i ! class_ "icon-edit" $ ""
                      " Edit Posts"
            else return ()
+   div ! class_ "row-fluid text-center" $ small $ do
+       "fork me on: "
+       a ! href "https://www.gitstar.com/scs/lbh" $ "gitstar"
+       " "
+       a ! href "https://www.github.com/scslab/lbh" $ "github"
 
       where uid = userId $ fromJust musr
 
