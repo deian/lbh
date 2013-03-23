@@ -17,19 +17,26 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Digest.Pure.MD5 as MD5
 import           Hails.Web hiding (body)
 import           Hails.HttpServer.Types
-import           Text.Blaze.Html5 hiding (Tag)
+import           Text.Blaze.Html5 hiding (Tag, map)
 import           Text.Blaze.Html5.Attributes hiding ( label, form, span
                                                     , title, style)
 import qualified Text.Blaze.Html5.Attributes as A
 import           Text.Blaze.Html.Renderer.Utf8
+import qualified Text.Blaze.Html.Renderer.String as SR
 
 import qualified Text.Pandoc.Readers.Markdown as P
 import qualified Text.Pandoc.Writers.HTML as P
 import qualified Text.Pandoc.Options as P
 import qualified Text.Pandoc.Highlighting as P
 
-import           LBH.ActiveCode (extractActieCodeBlocks)
+import           Text.RSS
+import           Network.URI (parseURI)
 
+import           LBH.ActiveCode ( extractActieCodeBlocks
+                                , activeCodeToInactiveBlocks ) 
+
+lbh :: String
+lbh = "https://www.learnbyhacking.org"
 
 respondHtml :: Maybe User -> Html -> Response
 respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
@@ -462,6 +469,9 @@ indexPosts idxTitle musr ups = do
       a ! class_ "btn btn-primary" ! href "/posts/new" $ do
         i ! class_ "icon-plus icon-white" $ ""
         " New Post"
+    div ! class_ "pull-right" $ a ! href "/rss/posts" $ do
+      img ! class_ "rss" ! src "/static/img/rss.png"
+      span ! class_ "rss" $ " subscribe to feed "
   div $ if null ups
     then p $ "Sorry, no posts... :-("
     else ul ! class_ "media-list " ! id "index-posts" $ do
@@ -537,6 +547,9 @@ showUser user ownPS colPS isCurrentUser = do
         ! href (toValue $ T.concat ["/users/", userId user, "/edit"]) $ do
         i ! class_ "icon-wrench icon-white" $ ""
         " Edit account"
+    div ! class_ "pull-right" $ a ! href "/rss/posts" $ do
+      img ! class_ "rss" ! src "/static/img/rss.png"
+      span ! class_ "rss" $ " subscribe to feed "
   when (not . null $ ownPS) $ do
     h5 $ "Owns:"
     ul ! class_ "nav nav-pills nav-stacked" $ do
@@ -661,6 +674,53 @@ indexTags ts = do
 
 tagsToJSON :: [TagEntry] -> Aeson.Value
 tagsToJSON ts = toJSON $ Aeson.object [ "tags" .= ts]
+
+--
+-- RSS
+--
+
+respondRss :: RSS -> Response
+respondRss rss = ok "application/rss+xml" $ L8.concat
+   [ "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"
+   , L8.pack $ "<?xml-stylesheet type=\"text/css\" href=" ++ show kate ++" ?>"
+   , L8.pack . showXML $ rssToXML $ rss
+   ]
+   where kate = lbh ++ "/static/css/kate.css"
+
+
+-- | Index posts
+rssIndexPosts :: String -> [Post] -> RSS
+rssIndexPosts idxTitle ps = do
+  RSS idxTitle (fromJust . parseURI $ lbh ++ "/posts") desc ch items 
+    where desc = "RSS feed for " ++ idxTitle ++ " on LearnByHacking"
+          ch = [ Language "en-us" ]
+          items = map postToRSSItem ps
+
+-- | Convert a post to an RSS Item                        
+postToRSSItem :: Post -> Item
+postToRSSItem post =
+  [ Title (T.unpack $ postTitle post)
+  , Link  (fromJust . parseURI $ lbh ++ "/posts/" ++ show (getPostId post))
+  , Description (T.unpack $ postDescription post)
+  , ContentEncoded (mkCE post)
+  , PubDate (postDate post)
+  ] ++
+  map mkAuthor (postOwner post : postCollaborators post)
+  ++
+  map mkCategory (postTags post)
+  where mkAuthor u = Author $ T.unpack u ++ "@learnbyhacking.org"
+        mkCategory t = Category Nothing (T.unpack t)
+        mkCE post = SR.renderHtml $ do
+          style $ toHtml $ P.styleToCss P.kate
+          div $ P.writeHtml wopts $
+            let md = P.readMarkdown ropts (T.unpack . crlf2lf $ postBody post)
+            in activeCodeToInactiveBlocks md
+        ropts = P.def { P.readerExtensions     = P.githubMarkdownExtensions }
+        wopts = P.def { P.writerHighlight      = True
+                      , P.writerHighlightStyle = P.kate
+                      , P.writerHtml5          = True
+                      , P.writerExtensions     = P.githubMarkdownExtensions }
+
 
 --
 -- Login

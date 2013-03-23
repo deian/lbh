@@ -3,6 +3,7 @@ module LBH.ActiveCode ( Code(..)
                       , Result(..)
                       , execCode
                       , extractActieCodeBlocks
+                      , activeCodeToInactiveBlocks
                       ) where
 
 import           Prelude hiding (id)
@@ -99,3 +100,21 @@ freshVar = do
   i <- get
   put (i+1)
   return i
+
+--
+--
+--
+
+  
+
+-- | Make active code inactive
+activeCodeToInactiveBlocks :: Pandoc -> Pandoc
+activeCodeToInactiveBlocks (Pandoc i bs) = Pandoc i (map a2i bs)
+ where a2i :: Block -> Block
+       a2i (CodeBlock attrs blk) =
+           let attrs' = case attrs of
+                 (x,(lang:y),z) -> (x,(stripPrefix' "active-" lang:y),z)
+                 _  -> attrs
+           in CodeBlock attrs' blk
+       a2i b = b
+       stripPrefix' x xs = fromMaybe xs $ stripPrefix x xs

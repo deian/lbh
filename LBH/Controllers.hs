@@ -43,6 +43,9 @@ server = mkRouter $ do
     routeName "tags"   tagsController
     Frank.post "/exec" execController
     Frank.get "/login" loginController
+    routeName "rss" $ do
+      Frank.get "/posts" rssPostsController
+      Frank.get "/users/:id" rssUserController
   
 
 --
@@ -227,6 +230,32 @@ welcomeController :: Controller Response
 welcomeController = maybeRegister $ do
     mu <- currentUser
     return $ respondHtml mu (welcome mu)
+
+
+--
+-- RSS
+--
+
+rssPostsController :: Controller Response
+rssPostsController = maybeRegister $  do
+  mu <- currentUser
+  ps <- liftLIO . withLBHPolicy $ findAll $ select [] "posts"
+  return $ respondRss $ rssIndexPosts "All posts" ps
+
+rssUserController :: Controller Response
+rssUserController = maybeRegister $ do
+  (Just uid) <- queryParam "id"
+  liftLIO . withLBHPolicy $ do
+    muser <- findBy "users" "_id" uid
+    os <- maybe (return [])
+                (\o -> findAll $ select ["owner" -: userId o] "posts") muser
+    let qry u = ["$in" -: [userId u]] :: BsonDocument
+    cs <- maybe (return [])
+                (\u -> findAll $ select ["collaborators" -: qry u] "posts")
+                muser
+    return $ maybe notFound
+                   (\u -> respondRss $ rssIndexPosts (mkT u) $ os ++ cs) muser
+      where mkT u = (T.unpack $ userFullName u) ++ "'s posts"
 
 --
 -- Helpers
