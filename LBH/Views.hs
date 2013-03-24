@@ -469,7 +469,7 @@ indexPosts idxTitle musr ups = do
       a ! class_ "btn btn-primary" ! href "/posts/new" $ do
         i ! class_ "icon-plus icon-white" $ ""
         " New Post"
-    div ! class_ "pull-right" $ a ! href "/rss/posts" $ do
+    div ! class_ "row-fluid" $ a ! class_ "pull-right" ! href "/rss/posts" $ do
       img ! class_ "rss" ! src "/static/img/rss.png"
       span ! class_ "rss" $ " subscribe to feed "
   div $ if null ups
@@ -542,14 +542,14 @@ showUser user ownPS colPS isCurrentUser = do
         div ! class_ "media-body" $ do
             h4 ! class_ "media-heading" $ toHtml $ userId user
             toHtml $ userFullName user
+            a ! class_ "pull-right" ! href "/rss/posts" $ do
+              img ! class_ "rss" ! src "/static/img/rss.png"
+              span ! class_ "rss" $ " subscribe to feed "
     when (isCurrentUser) $ do
       a ! class_ "btn btn-primary"
         ! href (toValue $ T.concat ["/users/", userId user, "/edit"]) $ do
         i ! class_ "icon-wrench icon-white" $ ""
         " Edit account"
-    div ! class_ "pull-right" $ a ! href "/rss/posts" $ do
-      img ! class_ "rss" ! src "/static/img/rss.png"
-      span ! class_ "rss" $ " subscribe to feed "
   when (not . null $ ownPS) $ do
     h5 $ "Owns:"
     ul ! class_ "nav nav-pills nav-stacked" $ do
