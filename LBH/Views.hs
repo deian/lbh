@@ -19,7 +19,7 @@ import           Hails.Web hiding (body)
 import           Hails.HttpServer.Types
 import           Text.Blaze.Html5 hiding (Tag, map)
 import           Text.Blaze.Html5.Attributes hiding ( label, form, span
-                                                    , title, style)
+                                                    , title, style )
 import qualified Text.Blaze.Html5.Attributes as A
 import           Text.Blaze.Html.Renderer.Utf8
 import qualified Text.Blaze.Html.Renderer.String as SR
@@ -29,14 +29,19 @@ import qualified Text.Pandoc.Writers.HTML as P
 import qualified Text.Pandoc.Options as P
 import qualified Text.Pandoc.Highlighting as P
 
-import           Text.RSS
-import           Network.URI (parseURI)
+import           Text.Atom.Feed
+import           Text.Atom.Feed.Export  (xmlFeed)
+import           Text.XML.Light.Output (showTopElement)
+import           System.Locale
 
 import           LBH.ActiveCode ( extractActieCodeBlocks
                                 , activeCodeToInactiveBlocks ) 
 
-lbh :: String
-lbh = "https://www.learnbyhacking.org"
+lbhAuthority :: String
+lbhAuthority = "learnbyhacking.org"
+
+lbhUrl :: String
+lbhUrl = "https://www." ++ lbhAuthority
 
 respondHtml :: Maybe User -> Html -> Response
 respondHtml muser content = okHtml $ renderHtml $ docTypeHtml $ do
@@ -469,9 +474,9 @@ indexPosts idxTitle musr ups = do
       a ! class_ "btn btn-primary" ! href "/posts/new" $ do
         i ! class_ "icon-plus icon-white" $ ""
         " New Post"
-    div $ a ! class_ "pull-right" ! href "/rss/posts" $ do
-      img ! class_ "rss" ! src "/static/img/rss.png"
-      span ! class_ "rss" $ " subscribe to feed "
+    div $ a ! class_ "pull-right" ! href "/atom/posts" $ do
+      img ! class_ "atom" ! src "/static/img/atom.png"
+      span ! class_ "atom" $ " subscribe to feed "
   div $ if null ups
     then p $ "Sorry, no posts... :-("
     else ul ! class_ "media-list " ! id "index-posts" $ do
@@ -548,9 +553,9 @@ showUser user ownPS colPS isCurrentUser = do
         i ! class_ "icon-wrench icon-white" $ ""
         " Edit account"
     div $ a ! class_ "pull-right"
-            ! href (toValue $ "/rss/users/" `T.append` userId user) $ do
-      img ! class_ "rss" ! src "/static/img/rss.png"
-      span ! class_ "rss" $ " subscribe to feed "
+            ! href (toValue $ "/atom/users/" `T.append` userId user) $ do
+      img ! class_ "atom" ! src "/static/img/atom.png"
+      span ! class_ "atom" $ " subscribe to feed "
   when (not . null $ ownPS) $ do
     h5 $ "Owns:"
     ul ! class_ "nav nav-pills nav-stacked" $ do
@@ -677,51 +682,71 @@ tagsToJSON :: [TagEntry] -> Aeson.Value
 tagsToJSON ts = toJSON $ Aeson.object [ "tags" .= ts]
 
 --
--- RSS
+-- ATOM
 --
 
-respondRss :: RSS -> Response
-respondRss rss = ok "application/rss+xml" $ L8.concat
-   [ "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"
-   , L8.pack $ "<?xml-stylesheet type=\"text/css\" href=" ++ show kate ++" ?>"
-   , L8.pack . showXML $ rssToXML $ rss
-   ]
-   where kate = lbh ++ "/static/css/kate.css"
-
+-- | Produce Atom response
+respondAtom :: Feed -> Response
+respondAtom atom = ok "application/atom+xml" $ L8.pack $ showTopElement (xmlFeed atom)
 
 -- | Index posts
-rssIndexPosts :: String -> [Post] -> RSS
-rssIndexPosts idxTitle ps = do
-  RSS idxTitle (fromJust . parseURI $ lbh ++ "/posts") desc ch items 
-    where desc = "RSS feed for " ++ idxTitle ++ " on LearnByHacking"
-          ch = [ Language "en-us" ]
-          items = map postToRSSItem ps
+atomIndexPosts :: String -> [(User, Post)] -> Feed
+atomIndexPosts idxTitle ups = 
+  (nullFeed fId fTitle fUpdated) {
+     feedLinks   = [ nullLink fUrl ]
+   , feedEntries = fEntries
+   } where fUrl      = lbhUrl ++ "/posts" 
+           fId       = "urn:x-" ++ lbhAuthority ++ ":posts" 
+           fTitle    = TextString idxTitle
+           fUpdated  = formatDateTime . maximum $ map (postDate . snd) ups
+           fEntries  = map postToAtomEntry ups
 
--- | Convert a post to an RSS Item                        
-postToRSSItem :: Post -> Item
-postToRSSItem post =
-  [ Title (T.unpack $ postTitle post)
-  , Link  (fromJust . parseURI $ lbh ++ "/posts/" ++ show (getPostId post))
-  , Description (T.unpack $ postDescription post)
-  , ContentEncoded (mkCE post)
-  , PubDate (postDate post)
-  ] ++
-  map mkAuthor (postOwner post : postCollaborators post)
-  ++
-  map mkCategory (postTags post)
-  where mkAuthor u = Author $ T.unpack u ++ "@learnbyhacking.org"
-        mkCategory t = Category Nothing (T.unpack t)
-        mkCE post = SR.renderHtml $ do
-          style $ toHtml $ P.styleToCss P.kate
-          div $ P.writeHtml wopts $
-            let md = P.readMarkdown ropts (T.unpack . crlf2lf $ postBody post)
-            in activeCodeToInactiveBlocks md
-        ropts = P.def { P.readerExtensions     = P.githubMarkdownExtensions }
-        wopts = P.def { P.writerHighlight      = True
-                      , P.writerHighlightStyle = P.kate
-                      , P.writerHtml5          = True
-                      , P.writerExtensions     = P.githubMarkdownExtensions }
+-- | Convert a post to an ATOM Item                        
+postToAtomEntry :: (User, Post) -> Entry
+postToAtomEntry (owner, post) =
+  (nullEntry eId eTitle eUpdated) {
+    entryAuthors     = [ mkAuthor owner ]
+  , entryCategories  = map (newCategory . T.unpack) $ postTags post
+  , entryContent     = Just $ HTMLContent eContent
+  , entryContributor = map mkContributor $ postCollaborators post
+    -- Currently do not distinguish between publish and update
+    -- TODO: add versioning to Post model
+  , entryLinks       = [ nullLink eUrl ]
+  , entryPublished   = Just eUpdated
+  } where eId      = "urn:x-" ++ lbhAuthority ++ ":posts-"
+                                              ++ show (getPostId post)
+          eTitle   = TextString . T.unpack . postTitle $ post
+          eUpdated = formatDateTime $ postDate post
+          eUrl     = lbhUrl ++ "/posts/" ++ show (getPostId post)
+          --
+          mkAuthor u = nullPerson {
+              personURI  = Just $ lbhUrl ++ "/users/" ++ T.unpack (userId u)
+            , personName = T.unpack $ userFullName u }
+          --
+          mkContributor u = nullPerson { personURI  = Just $
+                                          lbhUrl ++ "/users/" ++ T.unpack u }
+          --
+          eContent = SR.renderHtml $ do
+           style $ toHtml $ P.styleToCss P.kate
+           div $ P.writeHtml wopts $
+             let md = P.readMarkdown ropts (T.unpack . crlf2lf $ postBody post)
+             in activeCodeToInactiveBlocks md
+          --
+          ropts = P.def { P.readerExtensions     = P.githubMarkdownExtensions }
+          wopts = P.def { P.writerHighlight      = True
+                        , P.writerHighlightStyle = P.kate
+                        , P.writerHtml5          = True
+                        , P.writerExtensions     = P.githubMarkdownExtensions }
 
+
+-- | Format date for Atom following RFC3339
+formatDateTime :: UTCTime -> String
+formatDateTime dt =
+  let z = formatTime defaultTimeLocale "%z" dt
+      z' = if length z == 5
+             then let (h,m) = splitAt 3 z in h ++ ":" ++ m
+             else z
+  in formatTime defaultTimeLocale "%FT%T%Q" dt ++ z'
 
 --
 -- Login

@@ -43,9 +43,9 @@ server = mkRouter $ do
     routeName "tags"   tagsController
     Frank.post "/exec" execController
     Frank.get "/login" loginController
-    routeName "rss" $ do
-      Frank.get "/posts" rssPostsController
-      Frank.get "/users/:id" rssUserController
+    routeName "atom" $ do
+      Frank.get "/posts" atomPostsController
+      Frank.get "/users/:id" atomUserController
   
 
 --
@@ -233,17 +233,22 @@ welcomeController = maybeRegister $ do
 
 
 --
--- RSS
+-- ATOM
 --
 
-rssPostsController :: Controller Response
-rssPostsController = maybeRegister $  do
+atomPostsController :: Controller Response
+atomPostsController = maybeRegister $  do
   mu <- currentUser
   ps <- liftLIO . withLBHPolicy $ findAll $ select [] "posts"
-  return $ respondRss $ rssIndexPosts "All posts" ps
+  ups <- liftLIO $ forM ps $ \p-> do
+    u <- withLBHPolicy $ findBy  "users" "_id" (postOwner p)
+    return (fromMaybe (User { userId = postOwner p
+                            , userFullName = T.empty
+                            , userEmail = T.empty }) u, p)
+  return $ respondAtom $ atomIndexPosts "All posts" ups
 
-rssUserController :: Controller Response
-rssUserController = maybeRegister $ do
+atomUserController :: Controller Response
+atomUserController = maybeRegister $ do
   (Just uid) <- queryParam "id"
   liftLIO . withLBHPolicy $ do
     muser <- findBy "users" "_id" uid
@@ -254,7 +259,8 @@ rssUserController = maybeRegister $ do
                 (\u -> findAll $ select ["collaborators" -: qry u] "posts")
                 muser
     return $ maybe notFound
-                   (\u -> respondRss $ rssIndexPosts (mkT u) $ os ++ cs) muser
+                   (\u -> respondAtom $
+                      atomIndexPosts (mkT u) $ (zip (repeat u) (os ++ cs))) muser
       where mkT u = (T.unpack $ userFullName u) ++ "'s posts"
 
 --
