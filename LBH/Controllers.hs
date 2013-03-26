@@ -245,7 +245,7 @@ atomPostsController = maybeRegister $  do
     return (fromMaybe (User { userId = postOwner p
                             , userFullName = T.empty
                             , userEmail = T.empty }) u, p)
-  return $ respondAtom $ atomIndexPosts "All posts" ups
+  return $ respondAtom $ atomIndexPosts "LearnByHacking - All posts" ups
 
 atomUserController :: Controller Response
 atomUserController = maybeRegister $ do
@@ -261,7 +261,7 @@ atomUserController = maybeRegister $ do
     return $ maybe notFound
                    (\u -> respondAtom $
                       atomIndexPosts (mkT u) $ (zip (repeat u) (os ++ cs))) muser
-      where mkT u = (T.unpack $ userFullName u) ++ "'s posts"
+      where mkT u = "LearnByHacking - " ++ (T.unpack $ userFullName u) ++ "'s posts"
 
 --
 -- Helpers
