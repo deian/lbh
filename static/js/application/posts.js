@@ -279,10 +279,8 @@ $(document).ready(function() {
           var result_class = "exec-result alert alert-error";
           if (data.code == 0) {
             result_class = "exec-result alert alert-success";
-            $("#"+res_id).html(btn+"<i class=\"icon-ok\"></i> ");
-          } else {
-            $("#"+res_id).html(btn+"<i class=\"icon-remove\"></i> ");
           }
+          $("#"+res_id).html("");
           $("#"+res_id).attr("class",result_class);
           $("<b>", { text : data.result }).appendTo($("#"+res_id))
           window.parent.postMessage("preview-resize","*");
@@ -310,6 +308,9 @@ $(document).ready(function() {
       switch(mode) {
         case "c"  : mode = "text/x-csrc"  ; break;
         case "cpp": mode = "text/x-c++src"; break;
+        case "shell":
+        case "sh":  
+        case "bash":  mode = "shell"; break;
       }
       //
 

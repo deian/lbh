@@ -27,7 +27,8 @@ import qualified Text.Blaze.Html.Renderer.String as SR
 import qualified Text.Pandoc.Readers.Markdown as P
 import qualified Text.Pandoc.Writers.HTML as P
 import qualified Text.Pandoc.Options as P
-import qualified Text.Pandoc.Highlighting as P
+import qualified Text.Highlighting.Kate.Styles as P
+import qualified Text.Highlighting.Kate.Format.HTML as P
 
 import           Text.Atom.Feed
 import           Text.Atom.Feed.Export  (xmlFeed)
@@ -403,7 +404,7 @@ showPost muser post = do
 --  script ! src "/static/js/codemirror/mode/perl/perl.js" $ ""
 --  script ! src "/static/js/codemirror/mode/python/python.js" $ ""
 --  script ! src "/static/js/codemirror/mode/ruby/ruby.js" $ ""
---  script ! src "/static/js/codemirror/mode/shell/shell.js" $ ""
+  script ! src "/static/js/codemirror/mode/shell/shell.js" $ ""
   script ! src "/static/js/application/posts.js" $ ""
   -- Include post header
   div ! class_ "page-header" ! id "post-header" $ do

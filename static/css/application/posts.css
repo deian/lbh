@@ -31,3 +31,9 @@ textarea#body { min-height:250px; }
 	width: .6em;
 	background-color: #eee;
 }
+#post-preview-body {
+  min-height:250px;
+  width:100%;
+  overflow:hidden;
+  border:0px;
+} 
