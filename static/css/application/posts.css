@@ -28,9 +28,10 @@ textarea#body { min-height:250px; }
 }
 
 .CodeMirror-collapserange {
-	width: .6em;
-	background-color: #eee;
+  width: .6em;
+  background-color: #eee;
 }
+
 #post-preview-body {
   min-height:250px;
   width:100%;

@@ -27,8 +27,8 @@
 }
 
 .active-controller-btn {
-	position: relative;
-	top: -26px;
-	padding-right: 4px;
-	z-index: 99999;
+  position: relative;
+  top: -26px;
+  padding-right: 4px;
+  z-index: 99999;
 }

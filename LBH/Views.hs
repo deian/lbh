@@ -324,9 +324,6 @@ editPost post = do
   div ! id "post-preview" ! A.style "display: none" $ do
     ul ! class_ "breadcrumb" $ do
        li $ "Preview..."
-       li ! class_ "pull-right" $ do
-         a ! href "#" ! id "post-refresh-preview-btn" $
-           i ! class_ "icon-refresh" $ ""
     iframe ! id "post-preview-body"
            ! src (toValue $ "/posts/" ++ (show $ getPostId post))
            $ ""

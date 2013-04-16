@@ -10,8 +10,9 @@ import           Prelude hiding (id)
 
 import qualified Data.ByteString.Lazy.Char8 as L8
 import           Data.Aeson hiding (Result)
-import           Data.List (stripPrefix)
+import           Data.List (stripPrefix, concat, intercalate)
 import           Data.Maybe
+import           Data.Monoid
 
 import           Control.Applicative
 import           Control.Monad
@@ -81,17 +82,38 @@ extractFromBlock :: Block -> M [Block]
 extractFromBlock (CodeBlock attrs blk) | isActiveCode attrs
                                        && lang `elem` languages = do
   x <- freshVar
-  let _id = "raw-active-code-" ++ show x
+  let _id = "raw-active-code-" ++ (maybe (show x) ("named-"++) mName)
   return $ [(RawBlock "html" $ renderHtml $ do
               textarea ! id (toValue _id)
                        ! name (toValue _id)
                        ! class_ "raw-active-code"
-                       ! dataAttribute "lang" (toValue lang) $ toHtml blk)
+                       ! dataAttribute "lang" (toValue lang)
+                       ! (if isJust mDeps
+                            then dataAttribute "deps" (toValue (fromJust mDeps))
+                            else mempty)
+                       $ toHtml blk')
             ]
  where isActiveCode = isJust . getActiveLang
        getActiveLang (_,(x:_),_) = stripPrefix "active-" x
        getActiveLang _            = Nothing
+       --
        lang = fromJust $ getActiveLang attrs
+       -- drop first two lines if they're :name and :requires
+       blk' = let d = (if isJust mName then 1 else 0) + 
+                      (if isJust mDeps then 1 else 0)
+              in unlines' $ drop d $ lines blk
+       --
+       mName = safeIdx (lines blk) 0 >>= stripPrefix ":name="
+       --
+       mDeps = do 
+         mdps <- safeIdx (lines blk) $ if isJust mName then 1 else 0
+         dps  <- stripPrefix ":requires=" mdps
+         return . show . (map ("raw-active-code-named-"++)) . words $ dps
+       --
+       safeIdx xs i = if i < length xs then Just (xs!!i) else Nothing
+       --
+       unlines' = intercalate "\n"
+       
 extractFromBlock b = return [b]
 
 -- | Generate a fresh variable
