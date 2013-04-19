@@ -1,5 +1,7 @@
 module ActiveCode.Bash (bash) where
 
+import           ActiveCode.Utils
+
 import qualified Data.ByteString.Lazy.Char8 as L8
 
 import           Control.Monad
@@ -9,7 +11,6 @@ import           System.Exit
 
 bash :: L8.ByteString -> IO ()
 bash src = do
-  (code,out,err) <- readProcessWithExitCode "bash" [] (L8.unpack src)
-  unless (code == ExitSuccess) $ putStr err >> exitWith code
+  (code,out) <- readCommand "bash" [] (L8.unpack src)
   putStr out
-  exitSuccess
+  exitWith code
