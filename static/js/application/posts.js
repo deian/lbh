@@ -271,12 +271,6 @@ $(document).ready(function() {
       return count+1;
     }
 
-    // All elements that are also dependencies
-    var allDeps = [];
-    $(".raw-active-code").map(function() { 
-       $.unique($.merge(allDeps,$(this).data("deps") || [])); 
-    });
-
     $(".raw-active-code").map( function() {
       var mkController = function(div_id, id) {
         // create the [cog] Execute link
@@ -436,14 +430,15 @@ $(document).ready(function() {
 
       });
 
-      // Create active-code controller, if other code does
-      // not depend on it.
-      if($.inArray(id, allDeps)<0) {
+      // Create active-code controller, unless explicitly
+      // specified to not be executable
+      console.log("noexec? "+$("#"+id).data("noexec"));
+      if($("#"+id).data("noexec")) {
+        $("<div>", { html : "&nbsp;" }).appendTo($("#"+div_id));
+      } else {
         var exec = mkController(div_id,id);
         $("<div>", { class : "active-controller-btn"
                    , html : exec }).appendTo($("#"+div_id));
-      } else {
-        $("<div>", { html : "&nbsp;" }).appendTo($("#"+div_id));
       }
     }); //map over .raw-active-code
 

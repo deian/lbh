@@ -91,6 +91,9 @@ extractFromBlock (CodeBlock attrs blk) | isActiveCode attrs
                        ! (if isJust mDeps
                             then dataAttribute "deps" (toValue (fromJust mDeps))
                             else mempty)
+                       ! (if isJust mNoExec
+                            then dataAttribute "noexec" "true"
+                            else mempty)
                        $ toHtml blk')
             ]
  where isActiveCode = isJust . getActiveLang
@@ -103,14 +106,30 @@ extractFromBlock (CodeBlock attrs blk) | isActiveCode attrs
                       (if isJust mDeps then 1 else 0)
               in unlines' $ drop d $ lines blk
        --
-       mName = safeIdx (lines blk) 0 >>= stripPrefix ":name="
+       mName = microDSL $ \line -> do
+         mn <- stripPrefix ":name=" line
+         safeHead $ words mn
        --
-       mDeps = do 
-         mdps <- safeIdx (lines blk) $ if isJust mName then 1 else 0
-         dps  <- stripPrefix ":requires=" mdps
+       mDeps = microDSL $ \line -> do 
+         dps  <- stripPrefix ":requires=" line
          return . show . (map ("raw-active-code-named-"++)) . words $ dps
        --
+       mNoExec = microDSL $ \line -> do 
+         stripPrefix ":noexec" line
+       --
+       microDSL :: (String -> Maybe String) -> Maybe String
+       microDSL act = let ls = lines blk
+                          n  = min 3 (length ls)
+                      in microDSLdoit act $ take n ls
+       --
+       microDSLdoit act []     = Nothing
+       microDSLdoit act (l:ls) = case act l of
+                                  x@(Just _) -> x
+                                  _ -> microDSLdoit act ls
+       --
        safeIdx xs i = if i < length xs then Just (xs!!i) else Nothing
+       --
+       safeHead = \x -> safeIdx x 0
        --
        unlines' = intercalate "\n"
        
