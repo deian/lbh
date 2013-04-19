@@ -17,7 +17,7 @@ readCommand
     -> String               -- ^ standard input
     -> IO (ExitCode,String) -- ^ exitcode, stdout+stderr
 readCommand proc args input = do
-    let cmd = unwords $ proc : (args ++ ["1>&2"])
+    let cmd = unwords $ proc : (args ++ ["2>&1"])
     mask $ \restore -> do
       (inh, outh, _, pid) <- runInteractiveCommand cmd
       flip onException
