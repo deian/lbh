@@ -102,8 +102,7 @@ extractFromBlock (CodeBlock attrs blk) | isActiveCode attrs
        --
        lang = fromJust $ getActiveLang attrs
        -- drop first two lines if they're :name and :requires
-       blk' = let d = (if isJust mName then 1 else 0) + 
-                      (if isJust mDeps then 1 else 0)
+       blk' = let d = length $ filter isJust [mName, mDeps, mNoExec]
               in unlines' $ drop d $ lines blk
        --
        mName = microDSL $ \line -> do
