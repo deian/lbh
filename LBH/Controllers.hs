@@ -56,7 +56,8 @@ postsController :: RESTController
 postsController = do
   REST.index $ maybeRegister $  do
     mu <- currentUser
-    ps <- liftLIO . withLBHPolicy $ findAll $ select [] "posts"
+    ps <- liftLIO . withLBHPolicy $ findAll $ 
+            (select [] "posts") { sort = [Desc "date"] }
     ups <- liftLIO $ forM ps $ \p-> do
       u <- withLBHPolicy $ findBy  "users" "_id" (postOwner p)
       return (fromMaybe (User { userId = postOwner p
@@ -290,3 +291,4 @@ maybeRegister ctrl = do
   if isJust muName && isNothing musr
     then return $ redirectTo "/users/new"
     else ctrl
+

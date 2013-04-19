@@ -84,6 +84,7 @@ instance PolicyModule LBHPolicy where
            writers ==> ws
          field "owner" $ searchable
          field "tags"  $ searchable
+         field "date"  $ searchable
          field "collaborators" $ searchable
        -- = Users ===================================================
        collection "users" $ do
@@ -466,3 +467,4 @@ personaLoginEmailToUid app conf lreq = do
           xfm f cmp = let cs = unDCFormula cmp
                       in dcFormula $
                            Set.map (\c -> Clause $ Set.map f $ unClause c) cs
+
