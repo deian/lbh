@@ -251,11 +251,11 @@ $(document).ready(function() {
 
     // Cache all dependencies
     // id -> [all-deps]
-    var cachedDeps = [];
+    var cachedDeps = {};
 
     // Cache containing reverse dependencies
     // id -> [ all-rev-deps]
-    var cachedRevDeps = [];
+    var cachedRevDeps = {};
 
     // Map from id -> CodeMirror object
     var mapIdCM = [];
@@ -274,7 +274,7 @@ $(document).ready(function() {
     // All elements that are also dependencies
     var allDeps = [];
     $(".raw-active-code").map(function() { 
-       $.merge(allDeps,$(this).data("deps") || []); 
+       $.unique($.merge(allDeps,$(this).data("deps") || [])); 
     });
 
     $(".raw-active-code").map( function() {
@@ -317,7 +317,8 @@ $(document).ready(function() {
               deps.forEach(getDependencies);
               source += $("#"+id).text();
               //
-              
+              //
+
               // AJAX to execute code
               $.ajax({ url:'/exec'
                 , type: 'POST'
@@ -402,7 +403,8 @@ $(document).ready(function() {
           // add reverse dependencies to cache
           var revDeps = [id];
           // seen before:
-          var usedDeps = $("#"+id).data("deps") || []; usedDeps.push(id);
+          var usedDeps = $("#"+id).data("deps").slice(0) || []; 
+          usedDeps.push(id);
           $(".raw-active-code").each(function(idx,item) { 
             // if aready checked item
             if($.inArray(item.id,usedDeps)>=0) return;
